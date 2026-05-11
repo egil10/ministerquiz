@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="no">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Endless norsk ministerquiz med statsråder, regjeringer, parti, bilder, årstall og læringsmodus."
+    />
+    <title>Ministerquiz</title>
+    <link rel="preload" href="/data/ministers.json" as="fetch" crossorigin="anonymous" />
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="topbar" aria-label="Status">
+        <div>
+          <p class="eyebrow">Norsk regjeringshistorie</p>
+          <h1>Ministerquiz</h1>
+        </div>
+        <div class="score-strip" aria-live="polite">
+          <span><strong id="playedStat">0</strong> spilt</span>
+          <span><strong id="accuracyStat">0%</strong> treff</span>
+          <span><strong id="streakStat">0</strong> streak</span>
+        </div>
+      </section>
+
+      <section class="layout">
+        <aside class="control-rail" aria-label="Quizvalg">
+          <div class="rail-block">
+            <p class="rail-label">Modus</p>
+            <div class="mode-list" id="modeList"></div>
+          </div>
+
+          <div class="rail-block">
+            <label class="rail-label" for="eraFilter">Periode</label>
+            <select id="eraFilter">
+              <option value="all">Alle år</option>
+              <option value="current">Siste 25 år</option>
+              <option value="postwar">1945-</option>
+              <option value="interwar">1905-1945</option>
+              <option value="union">1814-1905</option>
+            </select>
+          </div>
+
+          <div class="rail-block">
+            <p class="rail-label">Datagrunnlag</p>
+            <div class="data-pills">
+              <span id="peopleStat">...</span>
+              <span id="rolesStat">...</span>
+              <span id="imagesStat">...</span>
+              <span id="currentStat">...</span>
+              <span id="sourceStat">...</span>
+            </div>
+          </div>
+
+          <button class="ghost-button" id="resetProgress" type="button">Nullstill progresjon</button>
+        </aside>
+
+        <section class="quiz-stage" aria-label="Quiz">
+          <div class="mode-tabs" role="tablist" aria-label="Visning">
+            <button class="view-tab active" type="button" data-view="play">Spill</button>
+            <button class="view-tab" type="button" data-view="learn">Lær</button>
+          </div>
+
+          <div id="playView">
+            <article class="question-card">
+              <div class="portrait-frame">
+                <img id="portrait" alt="" referrerpolicy="no-referrer" />
+                <div class="portrait-fallback" id="portraitFallback"></div>
+              </div>
+
+              <div class="question-main">
+                <div class="question-meta">
+                  <span id="modeBadge">Portrett</span>
+                  <span id="yearBadge">...</span>
+                </div>
+                <h2 id="questionText">Laster quiz...</h2>
+                <p id="questionHint" class="question-hint"></p>
+                <div id="choices" class="choices"></div>
+                <div class="answer-panel" id="answerPanel" hidden>
+                  <div>
+                    <p class="answer-kicker" id="answerKicker"></p>
+                    <h3 id="answerTitle"></h3>
+                    <p id="answerDetail"></p>
+                  </div>
+                  <button class="primary-button" id="nextQuestion" type="button">Neste</button>
+                </div>
+              </div>
+            </article>
+
+            <section class="fact-grid" aria-label="Fakta">
+              <div>
+                <span>Ministerpost</span>
+                <strong id="factOffice">...</strong>
+              </div>
+              <div>
+                <span>Parti</span>
+                <strong id="factParty">...</strong>
+              </div>
+              <div>
+                <span>Regjering</span>
+                <strong id="factGovernment">...</strong>
+              </div>
+              <div>
+                <span>Levetid</span>
+                <strong id="factLife">...</strong>
+              </div>
+            </section>
+          </div>
+
+          <div id="learnView" hidden>
+            <section class="learn-toolbar">
+              <input id="learnSearch" type="search" placeholder="Søk navn, parti, ministerpost, regjering" />
+              <select id="partyFilter">
+                <option value="all">Alle parti</option>
+              </select>
+              <div class="learn-count" id="learnCount" aria-live="polite">...</div>
+            </section>
+            <section class="learn-grid" id="learnGrid" aria-label="Statsråder"></section>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script type="module" src="/src/app.js"></script>
+  </body>
+</html>
