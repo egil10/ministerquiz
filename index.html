@@ -1,127 +1,173 @@
 <!doctype html>
-<html lang="no">
+<html lang="nb">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b1020" />
     <meta
       name="description"
-      content="Endless norsk ministerquiz med statsråder, regjeringer, parti, bilder, årstall og læringsmodus."
+      content="Norsk ministerquiz med statsråder, regjeringer, partier, portretter og årstall. Spill runder, lær historie og test deg selv."
     />
-    <title>Ministerquiz</title>
+    <title>Ministerquiz · norsk regjeringshistorie</title>
+    <link rel="preconnect" href="https://upload.wikimedia.org" crossorigin />
     <link rel="preload" href="/data/ministers.json" as="fetch" crossorigin="anonymous" />
     <link rel="stylesheet" href="/src/styles.css" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230b1020'/%3E%3Ctext x='50%25' y='56%25' text-anchor='middle' font-family='Inter,sans-serif' font-size='34' font-weight='800' fill='%23fef9c3'%3EM%3C/text%3E%3C/svg%3E" />
   </head>
   <body>
-    <main class="app-shell">
-      <section class="topbar" aria-label="Status">
+    <a class="skip-link" href="#stage">Hopp til quizen</a>
+
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">M</span>
         <div>
-          <p class="eyebrow">Norsk regjeringshistorie</p>
+          <p class="brand-eyebrow">Norsk regjeringshistorie · siden 1814</p>
           <h1>Ministerquiz</h1>
         </div>
-        <div class="score-strip" aria-live="polite">
-          <span><strong id="playedStat">0</strong> spilt</span>
-          <span><strong id="accuracyStat">0%</strong> treff</span>
-          <span><strong id="streakStat">0</strong> streak</span>
+      </div>
+      <nav class="view-switch" role="tablist" aria-label="Visning">
+        <button class="view-tab is-active" type="button" data-view="play" role="tab">Spill</button>
+        <button class="view-tab" type="button" data-view="learn" role="tab">Bla</button>
+        <button class="view-tab" type="button" data-view="stats" role="tab">Stats</button>
+      </nav>
+    </header>
+
+    <main class="app">
+      <section class="hero" aria-label="Status">
+        <div class="hero-stat">
+          <span class="hero-stat-label">Streak</span>
+          <strong id="statStreak">0</strong>
+        </div>
+        <div class="hero-stat">
+          <span class="hero-stat-label">Score</span>
+          <strong id="statScore">0</strong>
+        </div>
+        <div class="hero-stat">
+          <span class="hero-stat-label">Treff</span>
+          <strong id="statAccuracy">0%</strong>
+        </div>
+        <div class="hero-stat hero-stat-wide">
+          <span class="hero-stat-label">Runde</span>
+          <div class="round-progress" aria-hidden="true">
+            <span id="roundFill" class="round-progress-fill"></span>
+            <span id="roundLabel" class="round-progress-label">1 / 10</span>
+          </div>
         </div>
       </section>
 
-      <section class="layout">
-        <aside class="control-rail" aria-label="Quizvalg">
-          <div class="rail-block">
-            <p class="rail-label">Modus</p>
-            <div class="mode-list" id="modeList"></div>
+      <section class="filters" aria-label="Filtre">
+        <div class="chip-row" role="tablist" aria-label="Modus">
+          <span class="chip-row-label">Modus</span>
+          <div class="chip-row-list" id="modeList"></div>
+        </div>
+        <div class="chip-row" aria-label="Periode">
+          <span class="chip-row-label">Periode</span>
+          <div class="chip-row-list" id="eraList"></div>
+        </div>
+      </section>
+
+      <section id="stage" class="stage" aria-live="polite">
+        <!-- play view -->
+        <article id="playView" class="play">
+          <div class="portrait">
+            <div class="portrait-shimmer" aria-hidden="true"></div>
+            <img id="portraitImg" alt="" decoding="async" />
+            <div class="portrait-fallback" id="portraitFallback" aria-hidden="true"></div>
+            <div class="portrait-tag" id="portraitTag" aria-hidden="true"></div>
           </div>
 
-          <div class="rail-block">
-            <label class="rail-label" for="eraFilter">Periode</label>
-            <select id="eraFilter">
-              <option value="all">Alle år</option>
-              <option value="current">Siste 25 år</option>
-              <option value="postwar">1945-</option>
-              <option value="interwar">1905-1945</option>
-              <option value="union">1814-1905</option>
-            </select>
-          </div>
+          <div class="card">
+            <div class="card-meta">
+              <span class="badge badge-mode" id="badgeMode">Portrett</span>
+              <span class="badge" id="badgeYear">...</span>
+              <span class="badge" id="badgeGov" hidden></span>
+            </div>
+            <h2 id="questionText" class="question">Laster quiz…</h2>
+            <p id="questionHint" class="hint"></p>
 
-          <div class="rail-block">
-            <p class="rail-label">Datagrunnlag</p>
-            <div class="data-pills">
-              <span id="peopleStat">...</span>
-              <span id="rolesStat">...</span>
-              <span id="imagesStat">...</span>
-              <span id="currentStat">...</span>
-              <span id="sourceStat">...</span>
+            <div class="choices" id="choices"></div>
+
+            <div class="answer" id="answerPanel" hidden>
+              <div class="answer-body">
+                <p class="answer-kicker" id="answerKicker"></p>
+                <h3 id="answerTitle"></h3>
+                <p id="answerDetail"></p>
+                <p class="answer-links" id="answerLinks"></p>
+              </div>
+              <button class="primary" id="nextBtn" type="button">
+                <span>Neste</span>
+                <kbd>Enter</kbd>
+              </button>
             </div>
           </div>
+        </article>
 
-          <button class="ghost-button" id="resetProgress" type="button">Nullstill progresjon</button>
-        </aside>
-
-        <section class="quiz-stage" aria-label="Quiz">
-          <div class="mode-tabs" role="tablist" aria-label="Visning">
-            <button class="view-tab active" type="button" data-view="play">Spill</button>
-            <button class="view-tab" type="button" data-view="learn">Lær</button>
+        <!-- learn view -->
+        <section id="learnView" class="learn" hidden>
+          <div class="learn-toolbar">
+            <label class="search">
+              <svg viewBox="0 0 24 24" aria-hidden="true" width="18" height="18"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M21 21l-4.3-4.3M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z"/></svg>
+              <input id="learnSearch" type="search" placeholder="Søk navn, parti, post, regjering" autocomplete="off" />
+            </label>
+            <select id="partyFilter">
+              <option value="all">Alle parti</option>
+            </select>
+            <select id="learnEra">
+              <option value="all">Alle år</option>
+              <option value="current">Siste 25 år</option>
+              <option value="postwar">1945 →</option>
+              <option value="interwar">1905–1945</option>
+              <option value="union">1814–1905</option>
+            </select>
+            <span class="learn-count" id="learnCount">…</span>
           </div>
+          <div id="learnGrid" class="learn-grid"></div>
+        </section>
 
-          <div id="playView">
-            <article class="question-card">
-              <div class="portrait-frame">
-                <img id="portrait" alt="" referrerpolicy="no-referrer" />
-                <div class="portrait-fallback" id="portraitFallback"></div>
-              </div>
-
-              <div class="question-main">
-                <div class="question-meta">
-                  <span id="modeBadge">Portrett</span>
-                  <span id="yearBadge">...</span>
-                </div>
-                <h2 id="questionText">Laster quiz...</h2>
-                <p id="questionHint" class="question-hint"></p>
-                <div id="choices" class="choices"></div>
-                <div class="answer-panel" id="answerPanel" hidden>
-                  <div>
-                    <p class="answer-kicker" id="answerKicker"></p>
-                    <h3 id="answerTitle"></h3>
-                    <p id="answerDetail"></p>
-                  </div>
-                  <button class="primary-button" id="nextQuestion" type="button">Neste</button>
-                </div>
-              </div>
-            </article>
-
-            <section class="fact-grid" aria-label="Fakta">
-              <div>
-                <span>Ministerpost</span>
-                <strong id="factOffice">...</strong>
-              </div>
-              <div>
-                <span>Parti</span>
-                <strong id="factParty">...</strong>
-              </div>
-              <div>
-                <span>Regjering</span>
-                <strong id="factGovernment">...</strong>
-              </div>
-              <div>
-                <span>Levetid</span>
-                <strong id="factLife">...</strong>
-              </div>
-            </section>
+        <!-- stats view -->
+        <section id="statsView" class="stats" hidden>
+          <div class="stats-grid">
+            <div class="stats-card">
+              <span>Spilt</span>
+              <strong id="statPlayed">0</strong>
+            </div>
+            <div class="stats-card">
+              <span>Riktige</span>
+              <strong id="statCorrect">0</strong>
+            </div>
+            <div class="stats-card">
+              <span>Treffprosent</span>
+              <strong id="statAccuracyBig">0%</strong>
+            </div>
+            <div class="stats-card">
+              <span>Beste streak</span>
+              <strong id="statBest">0</strong>
+            </div>
           </div>
-
-          <div id="learnView" hidden>
-            <section class="learn-toolbar">
-              <input id="learnSearch" type="search" placeholder="Søk navn, parti, ministerpost, regjering" />
-              <select id="partyFilter">
-                <option value="all">Alle parti</option>
-              </select>
-              <div class="learn-count" id="learnCount" aria-live="polite">...</div>
-            </section>
-            <section class="learn-grid" id="learnGrid" aria-label="Statsråder"></section>
+          <div class="stats-card stats-card-wide">
+            <span class="stats-card-label">Per modus</span>
+            <table class="mode-table" id="modeTable"></table>
+          </div>
+          <div class="stats-card stats-card-wide">
+            <span class="stats-card-label">Datagrunnlag</span>
+            <ul class="data-list" id="dataList"></ul>
+          </div>
+          <div class="stats-actions">
+            <button class="ghost" id="resetProgress" type="button">Nullstill progresjon</button>
           </div>
         </section>
       </section>
     </main>
+
+    <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+    <footer class="foot">
+      <p>
+        Data fra <a href="https://www.regjeringen.no" rel="noopener" target="_blank">regjeringen.no</a> og
+        <a href="https://commons.wikimedia.org" rel="noopener" target="_blank">Wikimedia Commons</a>.
+        Bilder lokalt cachet for rask lasting.
+      </p>
+    </footer>
 
     <script type="module" src="/src/app.js"></script>
   </body>

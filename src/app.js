@@ -1,32 +1,42 @@
 const MODES = {
   portrait: {
     label: "Portrett",
-    help: "Gjett personen fra bilde og spor.",
     badge: "Portrett",
+    help: "Bilde → person",
   },
   office: {
     label: "Posten",
-    help: "Koble statsråd til ministerpost.",
     badge: "Ministerpost",
+    help: "Person → ministerpost",
   },
   party: {
     label: "Parti",
-    help: "Hvilket parti satt statsråden for?",
     badge: "Parti",
+    help: "Person → parti",
   },
   government: {
     label: "Regjering",
-    help: "Plasser rollen i riktig regjering.",
     badge: "Regjering",
+    help: "Rolle → regjering",
   },
   timeline: {
     label: "Tiår",
-    help: "Finn når rollen startet.",
-    badge: "Tidslinje",
+    badge: "Tiår",
+    help: "Når startet rollen?",
   },
 };
 
-const STORE_KEY = "ministerquiz.progress.v1";
+const ERAS = {
+  all: { label: "Alle år" },
+  current: { label: "Siste 25" },
+  postwar: { label: "1945→" },
+  interwar: { label: "1905–45" },
+  union: { label: "1814–1905" },
+};
+
+const STORE_KEY = "ministerquiz.profile.v2";
+const ROUND_SIZE = 10;
+
 const state = {
   data: null,
   people: [],
@@ -36,99 +46,125 @@ const state = {
   view: "play",
   current: null,
   answered: false,
+  preloadCache: new Map(),
   profile: loadProfile(),
 };
 
+const $ = (sel, root = document) => root.querySelector(sel);
+const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
+
 const els = {
-  modeList: document.querySelector("#modeList"),
-  eraFilter: document.querySelector("#eraFilter"),
-  choices: document.querySelector("#choices"),
-  portrait: document.querySelector("#portrait"),
-  portraitFrame: document.querySelector(".portrait-frame"),
-  portraitFallback: document.querySelector("#portraitFallback"),
-  questionText: document.querySelector("#questionText"),
-  questionHint: document.querySelector("#questionHint"),
-  modeBadge: document.querySelector("#modeBadge"),
-  yearBadge: document.querySelector("#yearBadge"),
-  answerPanel: document.querySelector("#answerPanel"),
-  answerKicker: document.querySelector("#answerKicker"),
-  answerTitle: document.querySelector("#answerTitle"),
-  answerDetail: document.querySelector("#answerDetail"),
-  nextQuestion: document.querySelector("#nextQuestion"),
-  playedStat: document.querySelector("#playedStat"),
-  accuracyStat: document.querySelector("#accuracyStat"),
-  streakStat: document.querySelector("#streakStat"),
-  peopleStat: document.querySelector("#peopleStat"),
-  rolesStat: document.querySelector("#rolesStat"),
-  imagesStat: document.querySelector("#imagesStat"),
-  currentStat: document.querySelector("#currentStat"),
-  sourceStat: document.querySelector("#sourceStat"),
-  factOffice: document.querySelector("#factOffice"),
-  factParty: document.querySelector("#factParty"),
-  factGovernment: document.querySelector("#factGovernment"),
-  factLife: document.querySelector("#factLife"),
-  resetProgress: document.querySelector("#resetProgress"),
-  learnView: document.querySelector("#learnView"),
-  playView: document.querySelector("#playView"),
-  learnSearch: document.querySelector("#learnSearch"),
-  partyFilter: document.querySelector("#partyFilter"),
-  learnCount: document.querySelector("#learnCount"),
-  learnGrid: document.querySelector("#learnGrid"),
+  modeList: $("#modeList"),
+  eraList: $("#eraList"),
+  choices: $("#choices"),
+  portrait: $(".portrait"),
+  portraitImg: $("#portraitImg"),
+  portraitFallback: $("#portraitFallback"),
+  portraitTag: $("#portraitTag"),
+  questionText: $("#questionText"),
+  questionHint: $("#questionHint"),
+  badgeMode: $("#badgeMode"),
+  badgeYear: $("#badgeYear"),
+  badgeGov: $("#badgeGov"),
+  answerPanel: $("#answerPanel"),
+  answerKicker: $("#answerKicker"),
+  answerTitle: $("#answerTitle"),
+  answerDetail: $("#answerDetail"),
+  answerLinks: $("#answerLinks"),
+  nextBtn: $("#nextBtn"),
+  statStreak: $("#statStreak"),
+  statScore: $("#statScore"),
+  statAccuracy: $("#statAccuracy"),
+  roundFill: $("#roundFill"),
+  roundLabel: $("#roundLabel"),
+  playView: $("#playView"),
+  learnView: $("#learnView"),
+  statsView: $("#statsView"),
+  learnSearch: $("#learnSearch"),
+  partyFilter: $("#partyFilter"),
+  learnEra: $("#learnEra"),
+  learnCount: $("#learnCount"),
+  learnGrid: $("#learnGrid"),
+  statPlayed: $("#statPlayed"),
+  statCorrect: $("#statCorrect"),
+  statAccuracyBig: $("#statAccuracyBig"),
+  statBest: $("#statBest"),
+  modeTable: $("#modeTable"),
+  dataList: $("#dataList"),
+  resetProgress: $("#resetProgress"),
+  toast: $("#toast"),
+  viewTabs: $$(".view-tab"),
 };
 
 init().catch((error) => {
   console.error(error);
   els.questionText.textContent = "Kunne ikke laste data.";
-  els.questionHint.textContent = "Sjekk at appen kjøres via en lokal server eller Vercel.";
+  els.questionHint.textContent =
+    "Sjekk at appen kjøres via en server (Vercel eller `npm run dev`).";
 });
 
 async function init() {
-  const response = await fetch("/data/ministers.json");
-  const data = await response.json();
+  const res = await fetch("/data/ministers.json", { cache: "force-cache" });
+  if (!res.ok) throw new Error(`Datafetch feilet: ${res.status}`);
+  const data = await res.json();
   state.data = data;
   state.people = data.people;
   state.roles = data.people.flatMap((person) =>
-    person.roles.map((role) => ({
+    (person.roles || []).map((role) => ({
       ...role,
       person,
-      partyMeta: data.parties[role.party] || { name: role.party || "Ukjent", color: "#64748b" },
-    }))
+      partyMeta: data.parties[role.party] || { name: role.party || "Ukjent", color: "#8a94c2" },
+    })),
   );
-  buildModeButtons();
+
+  buildModeChips();
+  buildEraChips();
   buildPartyFilter();
   bindEvents();
   renderStats();
+  renderRoundProgress();
+  renderDataPanel();
   nextQuestion();
-  renderLearn();
 }
 
 function bindEvents() {
-  els.eraFilter.addEventListener("change", () => {
-    state.era = els.eraFilter.value;
-    nextQuestion();
-    renderLearn();
-  });
-  els.nextQuestion.addEventListener("click", nextQuestion);
+  els.nextBtn.addEventListener("click", nextQuestion);
   els.resetProgress.addEventListener("click", () => {
+    if (!confirm("Nullstille all progresjon?")) return;
     state.profile = defaultProfile();
     saveProfile();
     renderStats();
+    renderRoundProgress();
+    showToast("Progresjon nullstilt");
   });
-  document.querySelectorAll(".view-tab").forEach((button) => {
-    button.addEventListener("click", () => {
-      state.view = button.dataset.view;
-      document.querySelectorAll(".view-tab").forEach((tab) => tab.classList.toggle("active", tab === button));
-      els.playView.hidden = state.view !== "play";
-      els.learnView.hidden = state.view !== "learn";
-      if (state.view === "learn") renderLearn();
-    });
+
+  els.viewTabs.forEach((tab) => {
+    tab.addEventListener("click", () => switchView(tab.dataset.view));
   });
+
   els.learnSearch.addEventListener("input", renderLearn);
   els.partyFilter.addEventListener("change", renderLearn);
-  els.portrait.addEventListener("error", () => showFallback(state.current?.role?.person?.name || ""));
+  els.learnEra.addEventListener("change", renderLearn);
+
+  els.portraitImg.addEventListener("load", () => {
+    els.portraitImg.classList.add("is-ready");
+    els.portrait.classList.add("is-loaded");
+  });
+  els.portraitImg.addEventListener("error", () => {
+    els.portrait.classList.remove("is-loaded");
+    els.portraitImg.classList.remove("is-ready");
+    setFallback(state.current?.role?.person?.name);
+  });
+
   window.addEventListener("keydown", (event) => {
     if (state.view !== "play") return;
-    if (event.key === "Enter" && state.answered) nextQuestion();
+    const target = event.target;
+    if (target && (target.tagName === "INPUT" || target.tagName === "SELECT" || target.tagName === "TEXTAREA")) return;
+    if (event.key === "Enter" && state.answered) {
+      event.preventDefault();
+      nextQuestion();
+      return;
+    }
     const index = Number(event.key) - 1;
     if (!state.answered && index >= 0 && index < 4) {
       els.choices.querySelectorAll(".choice")[index]?.click();
@@ -136,54 +172,93 @@ function bindEvents() {
   });
 }
 
-function buildModeButtons() {
+function switchView(view) {
+  state.view = view;
+  els.viewTabs.forEach((tab) => tab.classList.toggle("is-active", tab.dataset.view === view));
+  els.playView.hidden = view !== "play";
+  els.learnView.hidden = view !== "learn";
+  els.statsView.hidden = view !== "stats";
+  if (view === "learn") renderLearn();
+  if (view === "stats") renderStatsView();
+}
+
+function buildModeChips() {
   els.modeList.innerHTML = Object.entries(MODES)
     .map(
       ([key, mode]) => `
-        <button class="mode-button ${key === state.mode ? "active" : ""}" type="button" data-mode="${key}">
-          <strong>${mode.label}</strong>
-          <span>${mode.help}</span>
+        <button class="chip ${key === state.mode ? "is-active" : ""}" type="button" data-mode="${key}" title="${escapeAttr(mode.help)}">
+          ${escapeHtml(mode.label)}
         </button>
-      `
+      `,
     )
     .join("");
   els.modeList.querySelectorAll("button").forEach((button) => {
     button.addEventListener("click", () => {
       state.mode = button.dataset.mode;
-      els.modeList.querySelectorAll("button").forEach((item) =>
-        item.classList.toggle("active", item === button)
-      );
+      els.modeList.querySelectorAll("button").forEach((b) => b.classList.toggle("is-active", b === button));
+      nextQuestion();
+    });
+  });
+}
+
+function buildEraChips() {
+  els.eraList.innerHTML = Object.entries(ERAS)
+    .map(
+      ([key, era]) => `
+        <button class="chip ${key === state.era ? "is-active" : ""}" type="button" data-era="${key}">
+          ${escapeHtml(era.label)}
+        </button>
+      `,
+    )
+    .join("");
+  els.eraList.querySelectorAll("button").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.era = button.dataset.era;
+      els.eraList.querySelectorAll("button").forEach((b) => b.classList.toggle("is-active", b === button));
       nextQuestion();
     });
   });
 }
 
 function buildPartyFilter() {
-  const codes = [...new Set(state.roles.map((role) => role.party).filter(Boolean))].sort();
+  const codes = [...new Set(state.roles.map((role) => role.party).filter(Boolean))].sort((a, b) =>
+    partyName(a).localeCompare(partyName(b), "nb"),
+  );
   els.partyFilter.innerHTML += codes
-    .map((code) => `<option value="${escapeHtml(code)}">${escapeHtml(partyName(code))} (${escapeHtml(code)})</option>`)
+    .map(
+      (code) =>
+        `<option value="${escapeAttr(code)}">${escapeHtml(partyName(code))} (${escapeHtml(code)})</option>`,
+    )
     .join("");
 }
+
+/* ── Quiz logic ──────────────────────────────────────────── */
 
 function nextQuestion() {
   state.answered = false;
   els.answerPanel.hidden = true;
+  els.answerPanel.classList.remove("is-right", "is-wrong");
+
   const role = pickRole();
-  const current = buildQuestion(role);
-  state.current = current;
-  renderQuestion(current);
+  const question = buildQuestion(role);
+  state.current = question;
+  renderQuestion(question);
+  preloadUpcoming();
 }
 
 function pickRole() {
-  const roles = filteredRoles().filter(roleCanBeAsked);
-  const pool = roles.length ? roles : state.roles;
-  const imageBoost = state.mode === "portrait";
-  const weighted = pool.map((role) => {
+  const pool = filteredRoles().filter(roleAskable);
+  const fallback = state.roles.filter(roleAskable);
+  const universe = pool.length ? pool : fallback;
+  if (!universe.length) return state.roles[0];
+
+  const imageMode = state.mode === "portrait";
+  const weighted = universe.map((role) => {
     const seen = state.profile.mastery[role.personId]?.seen || 0;
     const correct = state.profile.mastery[role.personId]?.correct || 0;
-    const weakness = 1 + Math.max(0, seen - correct);
-    const image = role.person.image ? 1.8 : imageBoost ? 0.45 : 1;
-    const recent = state.profile.recent.includes(role.id) ? 0.25 : 1;
+    const weakness = 1 + Math.max(0, seen - correct) * 0.6;
+    const image = role.person.image ? (imageMode ? 1.8 : 1.1) : imageMode ? 0.1 : 1;
+    const recent = state.profile.recent.includes(role.id) ? 0.18 : 1;
     return { role, weight: weakness * image * recent };
   });
   const total = weighted.reduce((sum, item) => sum + item.weight, 0);
@@ -197,79 +272,104 @@ function pickRole() {
 
 function buildQuestion(role) {
   const mode = state.mode;
+  const dates = dateLabel(role);
+
   if (mode === "portrait") {
     return {
       role,
+      mode,
       correct: role.person.name,
       choices: choiceSet(role.person.name, state.people.map((person) => person.name)),
       prompt: "Hvem er dette?",
-      hint: `${role.title}${role.government ? ` i ${role.government}` : ""}, ${dateRange(role)}.`,
+      hint: `${role.title}${role.government ? ` · ${role.government}` : ""} · ${dates}.`,
     };
   }
   if (mode === "office") {
     return {
       role,
+      mode,
       correct: role.title,
       choices: choiceSet(role.title, state.data.offices),
-      prompt: `Hvilken post hadde ${role.person.name}?`,
-      hint: `${dateRange(role)}${role.government ? ` · ${role.government}` : ""}`,
+      prompt: `Hva var ${role.person.name} sin post?`,
+      hint: `${dates}${role.government ? ` · ${role.government}` : ""}`,
     };
   }
   if (mode === "party") {
     return {
       role,
+      mode,
       correct: role.party || "Ukjent",
       choices: choiceSet(role.party || "Ukjent", partyChoices()),
-      prompt: `Hvilket parti representerte ${role.person.name}?`,
-      hint: `${role.title}, ${dateRange(role)}${role.government ? ` · ${role.government}` : ""}`,
-      formatChoice: (value) => (value === "Ukjent" ? value : `${partyName(value)} (${value})`),
+      prompt: `Parti til ${role.person.name}?`,
+      hint: `${role.title} · ${dates}${role.government ? ` · ${role.government}` : ""}`,
+      formatChoice: (value) =>
+        value === "Ukjent" ? value : `${partyName(value)} (${value})`,
     };
   }
   if (mode === "government") {
     return {
       role,
+      mode,
       correct: role.government || "Ukjent regjering",
       choices: choiceSet(role.government || "Ukjent regjering", state.data.governments),
-      prompt: `Hvilken regjering passer?`,
-      hint: `${role.person.name} · ${role.title} · ${dateRange(role)}`,
+      prompt: "Hvilken regjering?",
+      hint: `${role.person.name} · ${role.title} · ${dates}`,
     };
   }
   const decade = `${Math.floor(startYear(role) / 10) * 10}-tallet`;
   return {
     role,
+    mode,
     correct: decade,
     choices: choiceSet(decade, decadeChoices()),
-    prompt: `Når startet denne rollen?`,
+    prompt: "Når startet denne rollen?",
     hint: `${role.person.name} som ${role.title}${role.government ? ` i ${role.government}` : ""}.`,
   };
 }
 
 function renderQuestion(question) {
   const { role } = question;
-  const mode = MODES[state.mode];
-  els.modeBadge.textContent = mode.badge;
-  els.yearBadge.textContent = dateRange(role);
+  const mode = MODES[question.mode];
+  els.badgeMode.textContent = mode.badge;
+  els.badgeYear.textContent = dateLabel(role);
+  if (role.government) {
+    els.badgeGov.textContent = role.government;
+    els.badgeGov.hidden = false;
+  } else {
+    els.badgeGov.hidden = true;
+  }
   els.questionText.textContent = question.prompt;
   els.questionHint.textContent = question.hint;
+
   renderPortrait(role.person);
   renderChoices(question);
-  renderFacts(role);
 }
 
 function renderPortrait(person) {
-  els.portrait.alt = person.image ? `Portrett av ${person.name}` : "";
+  els.portrait.classList.remove("is-loaded");
+  els.portraitImg.classList.remove("is-ready");
+  els.portraitImg.alt = person.image ? `Portrett av ${person.name}` : "";
+  els.portraitFallback.textContent = initials(person.name);
+  els.portraitTag.innerHTML = "";
+  els.portraitTag.classList.remove("is-shown");
+
   if (person.image) {
-    els.portraitFrame.classList.remove("is-empty");
-    els.portrait.src = person.image;
+    if (state.preloadCache.get(person.image) === true) {
+      els.portraitImg.src = person.image;
+      // load event will still fire even if cached
+    } else {
+      els.portraitImg.src = person.image;
+    }
   } else {
-    els.portrait.removeAttribute("src");
-    showFallback(person.name);
+    els.portraitImg.removeAttribute("src");
+    setFallback(person.name);
   }
 }
 
-function showFallback(name) {
-  els.portraitFrame.classList.add("is-empty");
-  els.portraitFallback.textContent = initials(name);
+function setFallback(name) {
+  els.portrait.classList.remove("is-loaded");
+  els.portraitImg.classList.remove("is-ready");
+  if (name) els.portraitFallback.textContent = initials(name);
 }
 
 function renderChoices(question) {
@@ -279,98 +379,115 @@ function renderChoices(question) {
     button.className = "choice";
     button.type = "button";
     button.dataset.value = choice;
-    button.innerHTML = `<span>${escapeHtml(question.formatChoice ? question.formatChoice(choice) : choice)}</span><small>${index + 1}</small>`;
-    button.addEventListener("click", () => answer(choice));
-    els.choices.append(button);
+    const text = question.formatChoice ? question.formatChoice(choice) : choice;
+    button.innerHTML = `
+      <span class="choice-key">${index + 1}</span>
+      <span class="choice-text">${escapeHtml(text)}</span>
+      <svg class="choice-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg>
+    `;
+    button.addEventListener("click", () => onAnswer(button, choice));
+    els.choices.appendChild(button);
   });
 }
 
-function answer(choice) {
+function onAnswer(button, value) {
   if (state.answered) return;
   state.answered = true;
   const current = state.current;
-  const correct = choice === current.correct;
-  els.choices.querySelectorAll(".choice").forEach((button) => {
-    const value = button.dataset.value;
-    button.classList.toggle("correct", value === current.correct);
-    button.classList.toggle("wrong", value === choice && !correct);
+  const correct = value === current.correct;
+
+  const buttons = els.choices.querySelectorAll(".choice");
+  buttons.forEach((b) => {
+    b.disabled = true;
+    if (b.dataset.value === current.correct) {
+      b.classList.add("is-correct");
+      setIcon(b.querySelector(".choice-icon"), "check");
+    } else if (b === button && !correct) {
+      b.classList.add("is-wrong", "is-shake");
+      setIcon(b.querySelector(".choice-icon"), "cross");
+    } else {
+      b.classList.add("is-dim");
+    }
   });
+
   updateProfile(correct, current.role);
   renderAnswer(correct, current.role);
-  renderStats();
-}
+  renderStats({ pop: correct ? "score" : "" });
+  renderRoundProgress({ pop: true });
 
-function renderAnswer(correct, role) {
-  const party = role.party ? `${partyName(role.party)} (${role.party})` : "parti ikke oppgitt";
-  els.answerKicker.textContent = correct ? "Riktig" : "Ikke helt";
-  els.answerTitle.textContent = `${role.person.name} · ${role.title}`;
-  els.answerDetail.textContent = `${party}. ${dateRange(role)}${role.government ? ` · ${role.government}` : ""}${
-    role.governmentInferred ? " · regjering utledet fra regjeringsperiode" : ""
-  }.`;
-  els.answerPanel.hidden = false;
-}
-
-function renderFacts(role) {
-  els.factOffice.textContent = role.title || "Ukjent";
-  els.factParty.innerHTML = partyMarkup(role.party);
-  els.factGovernment.textContent = role.government || "Ukjent";
-  els.factLife.textContent = lifeLabel(role.person);
-}
-
-function renderStats() {
-  const { played, correct, streak } = state.profile;
-  els.playedStat.textContent = played;
-  els.accuracyStat.textContent = played ? `${Math.round((correct / played) * 100)}%` : "0%";
-  els.streakStat.textContent = streak;
-  if (state.data) {
-    const currentRoles = state.roles.filter((role) => !role.end).length;
-    els.peopleStat.textContent = `${state.data.stats.people} personer`;
-    els.rolesStat.textContent = `${state.data.stats.roles} roller`;
-    els.imagesStat.textContent = `${state.data.stats.images} bilder`;
-    els.currentStat.textContent = `${currentRoles} nåværende`;
-    els.sourceStat.textContent = `Oppdatert ${formatGeneratedDate(state.data.generatedAt)}`;
+  if (state.profile.played > 0 && state.profile.played % ROUND_SIZE === 0) {
+    const lastRound = state.profile.roundHistory[state.profile.roundHistory.length - 1];
+    if (lastRound && lastRound.correct >= ROUND_SIZE) {
+      showToast(`Perfekt runde · ${lastRound.correct}/${ROUND_SIZE}`, "success");
+    } else if (lastRound) {
+      const tone = lastRound.correct >= 7 ? "success" : "";
+      showToast(`Runde ferdig · ${lastRound.correct}/${ROUND_SIZE}`, tone);
+    }
+  } else if (correct && state.profile.streak > 0 && state.profile.streak % 5 === 0) {
+    showToast(`${state.profile.streak} på rad! 🔥`, "success");
   }
 }
 
-function renderLearn() {
-  if (!state.data) return;
-  const query = normalize(els.learnSearch.value);
-  const party = els.partyFilter.value;
-  const filtered = state.people
-    .filter((person) => person.roles.some((role) => rolePassesEra({ ...role, person })))
-    .filter((person) => {
-      if (party !== "all" && !person.roles.some((role) => role.party === party)) return false;
-      if (!query) return true;
-      const haystack = normalize(
-        [person.name, person.birthYear, person.deathDate, ...person.roles.flatMap((role) => [role.title, role.party, role.government])]
-          .filter(Boolean)
-          .join(" ")
-      );
-      return haystack.includes(query);
-    })
-    .sort((a, b) => (b.image ? 1 : 0) - (a.image ? 1 : 0) || a.name.localeCompare(b.name, "nb"));
-  els.learnCount.textContent = `${filtered.length} treff`;
-  els.learnGrid.innerHTML = filtered.map(renderPersonCard).join("");
+function setIcon(svg, kind) {
+  if (!svg) return;
+  if (kind === "check") {
+    svg.innerHTML = '<polyline points="4 12 10 18 20 6"></polyline>';
+  } else {
+    svg.innerHTML = '<line x1="6" y1="6" x2="18" y2="18"></line><line x1="18" y1="6" x2="6" y2="18"></line>';
+  }
 }
 
-function renderPersonCard(person) {
-  const role = [...person.roles].sort((a, b) => (b.start || "").localeCompare(a.start || ""))[0];
-  const party = role?.party || "";
-  const media = person.image
-    ? `<img src="${escapeAttr(person.image)}" alt="Portrett av ${escapeAttr(person.name)}" referrerpolicy="no-referrer" loading="lazy">`
-    : `<div class="mini-fallback">${escapeHtml(initials(person.name))}</div>`;
-  return `
-    <article class="person-card">
-      ${media}
-      <div class="person-card-body">
-        ${partyMarkup(party)}
-        <h3>${escapeHtml(person.name)}</h3>
-        <p>${escapeHtml(role?.title || "Statsråd")} · ${escapeHtml(dateRange(role || {}))}</p>
-        <p>${escapeHtml(role?.government || "Regjering ikke oppgitt")}</p>
-      </div>
-    </article>
-  `;
+function renderAnswer(correct, role) {
+  const person = role.person;
+  const partyText = role.party ? `${partyName(role.party)} (${role.party})` : "parti ikke oppgitt";
+  els.answerPanel.classList.toggle("is-right", correct);
+  els.answerPanel.classList.toggle("is-wrong", !correct);
+  els.answerKicker.textContent = correct ? "Riktig" : "Ikke helt";
+  els.answerTitle.textContent = `${person.name} · ${role.title}`;
+  els.answerDetail.textContent = `${partyText}. ${dateLabel(role)}${role.government ? ` · ${role.government}` : ""}.`;
+
+  const links = [];
+  if (person.wikipedia) links.push(`<a href="${escapeAttr(person.wikipedia)}" target="_blank" rel="noopener">Wikipedia ↗</a>`);
+  if (person.source) links.push(`<a href="${escapeAttr(person.source)}" target="_blank" rel="noopener">Regjeringen.no ↗</a>`);
+  els.answerLinks.innerHTML = links.join("");
+
+  els.answerPanel.hidden = false;
+
+  // Portrait tag fades in with answer
+  els.portraitTag.innerHTML = renderPortraitTag(role);
+  els.portraitTag.classList.add("is-shown");
 }
+
+function renderPortraitTag(role) {
+  const partyMeta = role.party ? state.data.parties[role.party] : null;
+  const mark = partyMeta?.logo
+    ? `<img src="${escapeAttr(partyMeta.logo)}" alt="">`
+    : `<span class="party-dot" style="background:${escapeAttr(partyMeta?.color || "#8a94c2")}"></span>`;
+  const name = escapeHtml(role.person.name);
+  const partyLabel = role.party ? `${escapeHtml(partyName(role.party))}` : "Ukjent parti";
+  return `${mark}<span>${name} · ${partyLabel}</span>`;
+}
+
+function preloadUpcoming() {
+  // Best-effort: preload the next 3 candidate portraits so swaps are instant.
+  const candidates = filteredRoles().filter((role) => role.person.image).slice(0, 50);
+  shuffle(candidates)
+    .slice(0, 3)
+    .forEach((role) => preloadImage(role.person.image));
+}
+
+function preloadImage(url) {
+  if (!url || state.preloadCache.has(url)) return;
+  state.preloadCache.set(url, false);
+  const img = new Image();
+  img.decoding = "async";
+  img.referrerPolicy = "no-referrer";
+  img.onload = () => state.preloadCache.set(url, true);
+  img.onerror = () => state.preloadCache.set(url, false);
+  img.src = url;
+}
+
+/* ── Profile + stats ─────────────────────────────────────── */
 
 function updateProfile(correct, role) {
   const profile = state.profile;
@@ -384,28 +501,158 @@ function updateProfile(correct, role) {
   profile.mastery[role.personId] ||= { seen: 0, correct: 0 };
   profile.mastery[role.personId].seen += 1;
   profile.mastery[role.personId].correct += correct ? 1 : 0;
-  profile.recent = [role.id, ...profile.recent.filter((id) => id !== role.id)].slice(0, 24);
+  profile.recent = [role.id, ...profile.recent.filter((id) => id !== role.id)].slice(0, 40);
+
+  profile.currentRound ||= { played: 0, correct: 0 };
+  profile.currentRound.played += 1;
+  profile.currentRound.correct += correct ? 1 : 0;
+  if (profile.currentRound.played >= ROUND_SIZE) {
+    profile.roundHistory.push({ played: profile.currentRound.played, correct: profile.currentRound.correct });
+    if (profile.roundHistory.length > 30) profile.roundHistory.shift();
+    profile.currentRound = { played: 0, correct: 0 };
+  }
   saveProfile();
 }
 
-function filteredRoles() {
-  return state.roles.filter(rolePassesEra);
+function renderStats(options = {}) {
+  const { played, correct, streak } = state.profile;
+  setStat(els.statStreak, streak);
+  setStat(els.statScore, correct, options.pop === "score");
+  els.statAccuracy.textContent = played ? `${Math.round((correct / played) * 100)}%` : "0%";
 }
 
-function roleCanBeAsked(role) {
+function setStat(el, value, pop = false) {
+  const previous = el.textContent;
+  el.textContent = value;
+  if (pop && String(value) !== previous) {
+    const parent = el.closest(".hero-stat");
+    if (!parent) return;
+    parent.classList.add("is-pop");
+    setTimeout(() => parent.classList.remove("is-pop"), 320);
+  }
+}
+
+function renderRoundProgress(options = {}) {
+  const round = state.profile.currentRound || { played: 0, correct: 0 };
+  const pct = Math.min(100, (round.played / ROUND_SIZE) * 100);
+  els.roundFill.style.width = `${pct}%`;
+  els.roundLabel.textContent = `${round.played} / ${ROUND_SIZE}`;
+  if (options.pop) {
+    els.roundFill.parentElement.animate(
+      [{ transform: "scale(1)" }, { transform: "scale(1.03)" }, { transform: "scale(1)" }],
+      { duration: 240, easing: "ease-out" },
+    );
+  }
+}
+
+function renderStatsView() {
+  const { played, correct, bestStreak, byMode } = state.profile;
+  els.statPlayed.textContent = played;
+  els.statCorrect.textContent = correct;
+  els.statAccuracyBig.textContent = played ? `${Math.round((correct / played) * 100)}%` : "0%";
+  els.statBest.textContent = bestStreak;
+
+  const rows = Object.entries(MODES).map(([key, mode]) => {
+    const stats = byMode[key] || { played: 0, correct: 0 };
+    const acc = stats.played ? `${Math.round((stats.correct / stats.played) * 100)}%` : "—";
+    return `<tr><td>${escapeHtml(mode.label)}</td><td>${stats.played}</td><td>${stats.correct}</td><td>${acc}</td></tr>`;
+  });
+  els.modeTable.innerHTML = `
+    <thead><tr><th>Modus</th><th>Spilt</th><th>Riktig</th><th>%</th></tr></thead>
+    <tbody>${rows.join("")}</tbody>
+  `;
+
+  renderDataPanel();
+}
+
+function renderDataPanel() {
+  if (!state.data) return;
+  const currentRoles = state.roles.filter((role) => !role.end).length;
+  els.dataList.innerHTML = `
+    <li><span>Personer</span><strong>${state.data.stats.people}</strong></li>
+    <li><span>Roller</span><strong>${state.data.stats.roles}</strong></li>
+    <li><span>Bilder</span><strong>${state.data.stats.images}</strong></li>
+    <li><span>Regjeringer</span><strong>${state.data.stats.governments}</strong></li>
+    <li><span>Poster</span><strong>${state.data.stats.offices}</strong></li>
+    <li><span>Nåværende roller</span><strong>${currentRoles}</strong></li>
+    <li><span>Generert</span><strong>${escapeHtml(formatGeneratedDate(state.data.generatedAt))}</strong></li>
+  `;
+}
+
+/* ── Learn view ──────────────────────────────────────────── */
+
+function renderLearn() {
+  if (!state.data) return;
+  const query = normalize(els.learnSearch.value);
+  const party = els.partyFilter.value;
+  const eraKey = els.learnEra.value;
+  const filtered = state.people
+    .filter((person) => person.roles?.some((role) => rolePassesEra({ ...role, person }, eraKey)))
+    .filter((person) => {
+      if (party !== "all" && !person.roles.some((role) => role.party === party)) return false;
+      if (!query) return true;
+      const haystack = normalize(
+        [
+          person.name,
+          person.birthYear,
+          person.birthDate,
+          person.deathDate,
+          ...person.roles.flatMap((role) => [role.title, role.party, role.government]),
+        ]
+          .filter(Boolean)
+          .join(" "),
+      );
+      return haystack.includes(query);
+    })
+    .sort((a, b) => (b.image ? 1 : 0) - (a.image ? 1 : 0) || a.name.localeCompare(b.name, "nb"));
+
+  els.learnCount.textContent = `${filtered.length} treff`;
+  els.learnGrid.innerHTML = filtered.slice(0, 240).map(renderPersonCard).join("");
+}
+
+function renderPersonCard(person) {
+  const latest = [...(person.roles || [])].sort((a, b) => (b.start || "").localeCompare(a.start || ""))[0];
+  const party = latest?.party;
+  const partyMeta = party ? state.data.parties[party] : null;
+  const mark = partyMeta?.logo
+    ? `<img class="party-logo" src="${escapeAttr(partyMeta.logo)}" alt="">`
+    : `<span class="party-dot" style="background:${escapeAttr(partyMeta?.color || "#8a94c2")}"></span>`;
+  const media = person.image
+    ? `<img src="${escapeAttr(person.image)}" alt="Portrett av ${escapeAttr(person.name)}" loading="lazy" decoding="async">`
+    : `<div class="person-mini">${escapeHtml(initials(person.name))}</div>`;
+  return `
+    <article class="person">
+      <div class="person-media">${media}</div>
+      <div class="person-body">
+        ${party ? `<span class="party-chip">${mark}${escapeHtml(partyName(party))}</span>` : ""}
+        <h3>${escapeHtml(person.name)}</h3>
+        <p>${escapeHtml(latest?.title || "Statsråd")} · ${escapeHtml(dateLabel(latest || {}))}</p>
+        ${latest?.government ? `<p>${escapeHtml(latest.government)}</p>` : ""}
+      </div>
+    </article>
+  `;
+}
+
+/* ── Helpers ─────────────────────────────────────────────── */
+
+function filteredRoles() {
+  return state.roles.filter((role) => rolePassesEra(role, state.era));
+}
+
+function roleAskable(role) {
   if (!role.title || !role.start) return false;
   if (state.mode === "portrait") return Boolean(role.person.image);
   if (state.mode === "party") return Boolean(role.party);
   return true;
 }
 
-function rolePassesEra(role) {
+function rolePassesEra(role, eraKey) {
   const year = startYear(role);
   if (!year) return true;
-  if (state.era === "current") return year >= new Date().getFullYear() - 25;
-  if (state.era === "postwar") return year >= 1945;
-  if (state.era === "interwar") return year >= 1905 && year < 1945;
-  if (state.era === "union") return year < 1905;
+  if (eraKey === "current") return year >= new Date().getFullYear() - 25;
+  if (eraKey === "postwar") return year >= 1945;
+  if (eraKey === "interwar") return year >= 1905 && year < 1945;
+  if (eraKey === "union") return year < 1905;
   return true;
 }
 
@@ -420,7 +667,9 @@ function choiceSet(correct, universe) {
 }
 
 function partyChoices() {
-  const codes = Object.keys(state.data.parties).filter((code) => state.roles.some((role) => role.party === code));
+  const codes = Object.keys(state.data.parties).filter((code) =>
+    state.roles.some((role) => role.party === code),
+  );
   return [...codes, "Ukjent"];
 }
 
@@ -433,11 +682,11 @@ function startYear(role) {
   return Number(String(role.start || "").slice(0, 4));
 }
 
-function dateRange(role) {
+function dateLabel(role) {
   if (!role?.start && !role?.end) return "ukjent år";
   const start = formatDate(role.start);
   const end = role.end ? formatDate(role.end) : "nå";
-  return `${start}-${end}`;
+  return `${start}–${end}`;
 }
 
 function formatDate(value) {
@@ -453,35 +702,12 @@ function formatGeneratedDate(value) {
   return new Intl.DateTimeFormat("nb-NO", { dateStyle: "medium" }).format(date);
 }
 
-function lifeLabel(person) {
-  const birth = person.birthDate || person.birthYear || "?";
-  const death = person.deathDate || "";
-  return death ? `${birth}-${death}` : `født ${birth}`;
-}
-
 function partyName(code) {
   return state.data?.parties?.[code]?.name || code || "Ukjent";
 }
 
-function partyColor(code) {
-  return state.data?.parties?.[code]?.color || "#64748b";
-}
-
-function partyMarkup(code) {
-  if (!code) return "Ukjent";
-  const logo = partyLogo(code);
-  const mark = logo
-    ? `<img class="party-logo" src="${escapeAttr(logo)}" alt="" loading="lazy" referrerpolicy="no-referrer">`
-    : `<i class="party-dot" style="background:${escapeAttr(partyColor(code))}"></i>`;
-  return `<span class="party-chip">${mark}${escapeHtml(partyName(code))} (${escapeHtml(code)})</span>`;
-}
-
-function partyLogo(code) {
-  return state.data?.parties?.[code]?.logo || "";
-}
-
 function initials(name) {
-  return name
+  return String(name || "")
     .split(/\s+/)
     .filter(Boolean)
     .slice(0, 2)
@@ -519,6 +745,22 @@ function escapeAttr(value) {
   return escapeHtml(value).replaceAll("`", "&#096;");
 }
 
+function showToast(message, tone = "") {
+  els.toast.textContent = message;
+  els.toast.hidden = false;
+  els.toast.classList.remove("is-success", "is-fail", "is-shown");
+  if (tone === "success") els.toast.classList.add("is-success");
+  if (tone === "fail") els.toast.classList.add("is-fail");
+  // force reflow to retrigger transition
+  void els.toast.offsetWidth;
+  els.toast.classList.add("is-shown");
+  clearTimeout(showToast._timeout);
+  showToast._timeout = setTimeout(() => {
+    els.toast.classList.remove("is-shown");
+    setTimeout(() => (els.toast.hidden = true), 280);
+  }, 2200);
+}
+
 function defaultProfile() {
   return {
     played: 0,
@@ -528,17 +770,29 @@ function defaultProfile() {
     byMode: {},
     mastery: {},
     recent: [],
+    currentRound: { played: 0, correct: 0 },
+    roundHistory: [],
   };
 }
 
 function loadProfile() {
   try {
-    return { ...defaultProfile(), ...JSON.parse(localStorage.getItem(STORE_KEY) || "{}") };
+    const merged = { ...defaultProfile(), ...JSON.parse(localStorage.getItem(STORE_KEY) || "{}") };
+    merged.currentRound ||= { played: 0, correct: 0 };
+    merged.roundHistory ||= [];
+    merged.byMode ||= {};
+    merged.mastery ||= {};
+    merged.recent ||= [];
+    return merged;
   } catch {
     return defaultProfile();
   }
 }
 
 function saveProfile() {
-  localStorage.setItem(STORE_KEY, JSON.stringify(state.profile));
+  try {
+    localStorage.setItem(STORE_KEY, JSON.stringify(state.profile));
+  } catch {
+    /* storage may be unavailable in some sandboxes */
+  }
 }

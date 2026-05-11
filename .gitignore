@@ -1,5 +1,6 @@
 .cache/
 .vercel/
+.claude/
 node_modules/
 dist/
 public/
