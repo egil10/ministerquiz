@@ -5,6 +5,6 @@
   "type": "module",
   "scripts": {
     "dev": "python -m http.server 5173",
-    "build": "node scripts/check-data.mjs"
+    "build": "node scripts/build.mjs"
   }
 }
