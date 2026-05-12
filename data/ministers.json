@@ -21,52 +21,61 @@
     "A": {
       "name": "Arbeiderpartiet",
       "color": "#d71920",
-      "logoSource": "https://commons.wikimedia.org/wiki/Special:FilePath/Arbeiderpartiet%20logo.svg"
+      "logoSource": "https://commons.wikimedia.org/wiki/Special:FilePath/Arbeiderpartiet%20logo.svg",
+      "logo": "/img/parties/A.svg"
     },
     "H": {
       "name": "Høyre",
       "color": "#005eb8",
-      "logoSource": "https://commons.wikimedia.org/wiki/Special:FilePath/H%C3%B8yre%20logo.svg"
+      "logoSource": "https://commons.wikimedia.org/wiki/Special:FilePath/H%C3%B8yre%20logo.svg",
+      "logo": "/img/parties/H.svg"
     },
     "Sp": {
       "name": "Senterpartiet",
       "color": "#008542",
-      "logoSource": "https://commons.wikimedia.org/wiki/Special:FilePath/Senterpartiet%20logo.svg"
+      "logoSource": "https://commons.wikimedia.org/wiki/Special:FilePath/Senterpartiet%20logo.svg",
+      "logo": "/img/parties/Sp.png"
     },
     "FrP": {
       "name": "Fremskrittspartiet",
       "color": "#00529b",
-      "logoSource": "https://commons.wikimedia.org/wiki/Special:FilePath/Fremskrittspartiet%20logo.svg"
+      "logoSource": "https://commons.wikimedia.org/wiki/Special:FilePath/Fremskrittspartiet%20logo.svg",
+      "logo": "/img/parties/FrP.svg"
     },
     "SV": {
       "name": "Sosialistisk Venstreparti",
       "color": "#bf1e2e",
-      "logoSource": "https://commons.wikimedia.org/wiki/Special:FilePath/Sosialistisk%20Venstreparti%20logo.svg"
+      "logoSource": "https://commons.wikimedia.org/wiki/Special:FilePath/Sosialistisk%20Venstreparti%20logo.svg",
+      "logo": "/img/parties/SV.svg"
     },
     "V": {
       "name": "Venstre",
       "color": "#00843d",
-      "logoSource": "https://commons.wikimedia.org/wiki/Special:FilePath/Venstre%20logo.svg"
+      "logoSource": "https://commons.wikimedia.org/wiki/Special:FilePath/Venstre%20logo.svg",
+      "logo": "/img/parties/V.png"
     },
     "KrF": {
       "name": "Kristelig Folkeparti",
       "color": "#f4a900",
-      "logoSource": "https://commons.wikimedia.org/wiki/Special:FilePath/Kristelig%20Folkeparti%20logo.svg"
+      "logoSource": "https://commons.wikimedia.org/wiki/Special:FilePath/Kristelig%20Folkeparti%20logo.svg",
+      "logo": "/img/parties/KrF.svg"
     },
     "KRF": {
       "name": "Kristelig Folkeparti",
       "color": "#f4a900",
-      "logoSource": "https://commons.wikimedia.org/wiki/Special:FilePath/Kristelig%20Folkeparti%20logo.svg"
+      "logoSource": "https://commons.wikimedia.org/wiki/Special:FilePath/Kristelig%20Folkeparti%20logo.svg",
+      "logo": "/img/parties/KrF.svg"
     },
     "NKP": {
       "name": "Norges Kommunistiske Parti",
       "color": "#c40000",
-      "logoSource": "https://commons.wikimedia.org/wiki/Special:FilePath/Norges%20Kommunistiske%20Parti%20logo.svg"
+      "logoSource": "https://commons.wikimedia.org/wiki/Special:FilePath/Norges%20Kommunistiske%20Parti%20logo.svg",
+      "logo": "/img/parties/NKP.svg"
     },
     "NS": {
       "name": "Nasjonal Samling",
       "color": "#6e1f21",
-      "logo": ""
+      "logo": "/img/parties/NS.svg"
     },
     "B": {
       "name": "Bondepartiet",

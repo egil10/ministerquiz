@@ -462,13 +462,13 @@ function partyBadge(code, size = "sm") {
   const meta = code ? state.data?.parties?.[code] : null;
   const color = meta?.color || "#9a9a9a";
   const logo = meta?.logo || meta?.logoSource || "";
-  const label = code ? shortPartyCode(code) : "?";
-  const style = `background:${escapeAttr(color)}`;
   const sizeClass = size === "md" ? "size-md" : size === "lg" ? "size-lg" : "size-sm";
+  const title = escapeAttr(partyName(code));
   if (logo) {
-    return `<span class="party-badge ${sizeClass}" style="${style}" title="${escapeAttr(partyName(code))}"><img src="${escapeAttr(logo)}" alt="" loading="lazy" decoding="async" onerror="this.remove()"></span>`;
+    return `<span class="party-badge has-logo ${sizeClass}" title="${title}"><img src="${escapeAttr(logo)}" alt="" loading="lazy" decoding="async" onerror="this.parentNode.classList.remove('has-logo');this.parentNode.style.background='${escapeAttr(color)}';this.parentNode.textContent='${escapeAttr(shortPartyCode(code))}';"></span>`;
   }
-  return `<span class="party-badge ${sizeClass}" style="${style}" title="${escapeAttr(partyName(code))}">${escapeHtml(label)}</span>`;
+  const label = shortPartyCode(code);
+  return `<span class="party-badge ${sizeClass}" style="background:${escapeAttr(color)}" title="${title}">${escapeHtml(label)}</span>`;
 }
 
 function shortPartyCode(code) {
