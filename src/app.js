@@ -1,41 +1,44 @@
 const MODES = {
-  portrait: {
-    label: "Portrett",
-    badge: "Portrett",
-    help: "Bilde → person",
-  },
-  office: {
-    label: "Posten",
-    badge: "Ministerpost",
-    help: "Person → ministerpost",
-  },
-  party: {
-    label: "Parti",
-    badge: "Parti",
-    help: "Person → parti",
-  },
-  government: {
-    label: "Regjering",
-    badge: "Regjering",
-    help: "Rolle → regjering",
-  },
-  timeline: {
-    label: "Tiår",
-    badge: "Tiår",
-    help: "Når startet rollen?",
-  },
+  portrait:   { label: "Portrett",  badge: "Portrett",     help: "Bilde → person" },
+  office:     { label: "Posten",    badge: "Ministerpost", help: "Person → ministerpost" },
+  party:      { label: "Parti",     badge: "Parti",        help: "Person → parti" },
+  government: { label: "Regjering", badge: "Regjering",    help: "Rolle → regjering" },
+  timeline:   { label: "Tiår",      badge: "Tiår",         help: "Når startet rollen?" },
 };
 
 const ERAS = {
-  all: { label: "Alle år" },
-  current: { label: "Siste 25 år" },
-  postwar: { label: "1945 →" },
+  all:      { label: "Alle år" },
+  current:  { label: "Siste 25 år" },
+  postwar:  { label: "1945 →" },
   interwar: { label: "1905–1945" },
-  union: { label: "1814–1905" },
+  union:    { label: "1814–1905" },
 };
 
 const STORE_KEY = "ministerquiz.profile.v2";
+const THEME_KEY = "mq.theme";
 const ROUND_SIZE = 10;
+
+/* ── Lucide-style icons (open-source SVG paths) ─────────── */
+const ICONS = {
+  check: '<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>',
+  x:     '<svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>',
+  sun:   '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>',
+  moon:  '<svg viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>',
+  search:'<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>',
+  flame: '<svg viewBox="0 0 24 24"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>',
+};
+
+function icon(name) {
+  return ICONS[name] || "";
+}
+
+function paintIcons(root = document) {
+  root.querySelectorAll("[data-icon]").forEach((el) => {
+    const name = el.dataset.icon;
+    if (!ICONS[name] || el.firstElementChild) return;
+    el.innerHTML = ICONS[name];
+  });
+}
 
 const state = {
   data: null,
@@ -65,17 +68,13 @@ const els = {
   questionHint: $("#questionHint"),
   badgeMode: $("#badgeMode"),
   badgeYear: $("#badgeYear"),
-  badgeGov: $("#badgeGov"),
-  badgeGovSep: $("#badgeGovSep"),
+  railStreak: $("#railStreak"),
+  railStreakValue: $("#railStreakValue"),
   answerPanel: $("#answerPanel"),
-  answerKicker: $("#answerKicker"),
   answerTitle: $("#answerTitle"),
   answerDetail: $("#answerDetail"),
   answerLinks: $("#answerLinks"),
   nextBtn: $("#nextBtn"),
-  statStreak: $("#statStreak"),
-  statScore: $("#statScore"),
-  statAccuracy: $("#statAccuracy"),
   roundFill: $("#roundFill"),
   roundLabel: $("#roundLabel"),
   playView: $("#playView"),
@@ -93,9 +92,14 @@ const els = {
   modeTable: $("#modeTable"),
   dataList: $("#dataList"),
   resetProgress: $("#resetProgress"),
+  footStats: $("#footStats"),
   toast: $("#toast"),
   viewTabs: $$(".view-tab"),
+  themeToggle: $("#themeToggle"),
 };
+
+paintIcons();
+initTheme();
 
 init().catch((error) => {
   console.error(error);
@@ -114,7 +118,7 @@ async function init() {
     (person.roles || []).map((role) => ({
       ...role,
       person,
-      partyMeta: data.parties[role.party] || { name: role.party || "Ukjent", color: "#8a94c2" },
+      partyMeta: data.parties[role.party] || { name: role.party || "Ukjent", color: "#9a9a9a" },
     })),
   );
 
@@ -124,10 +128,38 @@ async function init() {
   bindEvents();
   renderStats();
   renderRoundProgress();
-  renderDataPanel();
+  renderFootStats();
   nextQuestion();
 }
 
+/* ── Theme ───────────────────────────────────────────────── */
+function initTheme() {
+  const stored = safeStorage.get(THEME_KEY);
+  const prefersDark = window.matchMedia?.("(prefers-color-scheme: dark)").matches;
+  const theme = stored || (prefersDark ? "dark" : "light");
+  applyTheme(theme);
+  els.themeToggle?.addEventListener("click", () => {
+    const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+    applyTheme(next);
+    safeStorage.set(THEME_KEY, next);
+  });
+}
+
+function applyTheme(theme) {
+  if (theme === "dark") document.documentElement.setAttribute("data-theme", "dark");
+  else document.documentElement.removeAttribute("data-theme");
+}
+
+const safeStorage = {
+  get(key) {
+    try { return localStorage.getItem(key); } catch { return null; }
+  },
+  set(key, value) {
+    try { localStorage.setItem(key, value); } catch {}
+  },
+};
+
+/* ── Bindings ────────────────────────────────────────────── */
 function bindEvents() {
   els.nextBtn.addEventListener("click", nextQuestion);
   els.resetProgress.addEventListener("click", () => {
@@ -179,6 +211,8 @@ function switchView(view) {
   els.playView.hidden = view !== "play";
   els.learnView.hidden = view !== "learn";
   els.statsView.hidden = view !== "stats";
+  const controls = $("#controls");
+  if (controls) controls.hidden = view !== "play";
   if (view === "learn") renderLearn();
   if (view === "stats") renderStatsView();
 }
@@ -218,17 +252,19 @@ function buildPartyFilter() {
   els.partyFilter.innerHTML += codes
     .map(
       (code) =>
-        `<option value="${escapeAttr(code)}">${escapeHtml(partyName(code))} (${escapeHtml(code)})</option>`,
+        `<option value="${escapeAttr(code)}">${escapeHtml(partyName(code))}</option>`,
     )
     .join("");
 }
 
 /* ── Quiz logic ──────────────────────────────────────────── */
-
 function nextQuestion() {
   state.answered = false;
-  els.answerPanel.hidden = true;
-  els.answerPanel.classList.remove("is-right", "is-wrong");
+  els.answerPanel.classList.remove("is-shown", "is-right", "is-wrong");
+  // clear answer text but keep nbsp to preserve layout
+  els.answerTitle.innerHTML = "&nbsp;";
+  els.answerDetail.innerHTML = "&nbsp;";
+  els.answerLinks.innerHTML = "";
 
   const role = pickRole();
   const question = buildQuestion(role);
@@ -267,18 +303,16 @@ function buildQuestion(role) {
 
   if (mode === "portrait") {
     return {
-      role,
-      mode,
+      role, mode,
       correct: role.person.name,
-      choices: choiceSet(role.person.name, state.people.map((person) => person.name)),
+      choices: choiceSet(role.person.name, state.people.map((p) => p.name)),
       prompt: "Hvem er dette?",
       hint: `${role.title}${role.government ? ` · ${role.government}` : ""} · ${dates}.`,
     };
   }
   if (mode === "office") {
     return {
-      role,
-      mode,
+      role, mode,
       correct: role.title,
       choices: choiceSet(role.title, state.data.offices),
       prompt: `Hva var ${role.person.name} sin post?`,
@@ -287,20 +321,17 @@ function buildQuestion(role) {
   }
   if (mode === "party") {
     return {
-      role,
-      mode,
+      role, mode,
       correct: role.party || "Ukjent",
       choices: choiceSet(role.party || "Ukjent", partyChoices()),
       prompt: `Parti til ${role.person.name}?`,
       hint: `${role.title} · ${dates}${role.government ? ` · ${role.government}` : ""}`,
-      formatChoice: (value) =>
-        value === "Ukjent" ? value : `${partyName(value)} (${value})`,
+      formatChoice: (value) => (value === "Ukjent" ? value : partyName(value)),
     };
   }
   if (mode === "government") {
     return {
-      role,
-      mode,
+      role, mode,
       correct: role.government || "Ukjent regjering",
       choices: choiceSet(role.government || "Ukjent regjering", state.data.governments),
       prompt: "Hvilken regjering?",
@@ -309,8 +340,7 @@ function buildQuestion(role) {
   }
   const decade = `${Math.floor(startYear(role) / 10) * 10}-tallet`;
   return {
-    role,
-    mode,
+    role, mode,
     correct: decade,
     choices: choiceSet(decade, decadeChoices()),
     prompt: "Når startet denne rollen?",
@@ -323,14 +353,6 @@ function renderQuestion(question) {
   const mode = MODES[question.mode];
   els.badgeMode.textContent = mode.badge;
   els.badgeYear.textContent = dateLabel(role);
-  if (role.government) {
-    els.badgeGov.textContent = role.government;
-    els.badgeGov.hidden = false;
-    if (els.badgeGovSep) els.badgeGovSep.hidden = false;
-  } else {
-    els.badgeGov.hidden = true;
-    if (els.badgeGovSep) els.badgeGovSep.hidden = true;
-  }
   els.questionText.textContent = question.prompt;
   els.questionHint.textContent = question.hint;
 
@@ -347,12 +369,7 @@ function renderPortrait(person) {
   els.portraitTag.classList.remove("is-shown");
 
   if (person.image) {
-    if (state.preloadCache.get(person.image) === true) {
-      els.portraitImg.src = person.image;
-      // load event will still fire even if cached
-    } else {
-      els.portraitImg.src = person.image;
-    }
+    els.portraitImg.src = person.image;
   } else {
     els.portraitImg.removeAttribute("src");
     setFallback(person.name);
@@ -376,7 +393,7 @@ function renderChoices(question) {
     button.innerHTML = `
       <span class="choice-key">${index + 1}</span>
       <span class="choice-text">${escapeHtml(text)}</span>
-      <svg class="choice-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg>
+      <span class="icon choice-icon" aria-hidden="true"></span>
     `;
     button.addEventListener("click", () => onAnswer(button, choice));
     els.choices.appendChild(button);
@@ -392,12 +409,13 @@ function onAnswer(button, value) {
   const buttons = els.choices.querySelectorAll(".choice");
   buttons.forEach((b) => {
     b.disabled = true;
+    const iconEl = b.querySelector(".choice-icon");
     if (b.dataset.value === current.correct) {
       b.classList.add("is-correct");
-      setIcon(b.querySelector(".choice-icon"), "check");
+      if (iconEl) iconEl.innerHTML = icon("check");
     } else if (b === button && !correct) {
       b.classList.add("is-wrong", "is-shake");
-      setIcon(b.querySelector(".choice-icon"), "cross");
+      if (iconEl) iconEl.innerHTML = icon("x");
     } else {
       b.classList.add("is-dim");
     }
@@ -405,8 +423,8 @@ function onAnswer(button, value) {
 
   updateProfile(correct, current.role);
   renderAnswer(correct, current.role);
-  renderStats({ pop: correct ? "score" : "" });
-  renderRoundProgress({ pop: true });
+  renderStats({ pop: correct ? "streak" : "" });
+  renderRoundProgress();
 
   if (state.profile.played > 0 && state.profile.played % ROUND_SIZE === 0) {
     const lastRound = state.profile.roundHistory[state.profile.roundHistory.length - 1];
@@ -414,39 +432,28 @@ function onAnswer(button, value) {
       showToast(`Perfekt runde · ${lastRound.correct}/${ROUND_SIZE}`, "success");
     } else if (lastRound) {
       const tone = lastRound.correct >= 7 ? "success" : "";
-      showToast(`Runde ferdig · ${lastRound.correct}/${ROUND_SIZE}`, tone);
+      showToast(`Runde · ${lastRound.correct}/${ROUND_SIZE}`, tone);
     }
   } else if (correct && state.profile.streak > 0 && state.profile.streak % 5 === 0) {
-    showToast(`${state.profile.streak} på rad! 🔥`, "success");
-  }
-}
-
-function setIcon(svg, kind) {
-  if (!svg) return;
-  if (kind === "check") {
-    svg.innerHTML = '<polyline points="4 12 10 18 20 6"></polyline>';
-  } else {
-    svg.innerHTML = '<line x1="6" y1="6" x2="18" y2="18"></line><line x1="18" y1="6" x2="6" y2="18"></line>';
+    showToast(`${state.profile.streak} på rad`, "success");
   }
 }
 
 function renderAnswer(correct, role) {
   const person = role.person;
-  const partyText = role.party ? `${partyName(role.party)} (${role.party})` : "parti ikke oppgitt";
+  const partyText = role.party ? partyName(role.party) : "uavhengig";
   els.answerPanel.classList.toggle("is-right", correct);
   els.answerPanel.classList.toggle("is-wrong", !correct);
-  els.answerKicker.textContent = correct ? "Riktig" : "Ikke helt";
   els.answerTitle.textContent = `${person.name} · ${role.title}`;
-  els.answerDetail.textContent = `${partyText}. ${dateLabel(role)}${role.government ? ` · ${role.government}` : ""}.`;
+  els.answerDetail.textContent = `${partyText} · ${dateLabel(role)}${role.government ? ` · ${role.government}` : ""}`;
 
   const links = [];
-  if (person.wikipedia) links.push(`<a href="${escapeAttr(person.wikipedia)}" target="_blank" rel="noopener">Wikipedia ↗</a>`);
-  if (person.source) links.push(`<a href="${escapeAttr(person.source)}" target="_blank" rel="noopener">Regjeringen.no ↗</a>`);
+  if (person.wikipedia) links.push(`<a href="${escapeAttr(person.wikipedia)}" target="_blank" rel="noopener">Wikipedia</a>`);
+  if (person.source) links.push(`<a href="${escapeAttr(person.source)}" target="_blank" rel="noopener">Regjeringen.no</a>`);
   els.answerLinks.innerHTML = links.join("");
 
-  els.answerPanel.hidden = false;
+  els.answerPanel.classList.add("is-shown");
 
-  // Portrait tag fades in with answer
   els.portraitTag.innerHTML = renderPortraitTag(role);
   els.portraitTag.classList.add("is-shown");
 }
@@ -479,11 +486,8 @@ function shortPartyCode(code) {
 }
 
 function preloadUpcoming() {
-  // Best-effort: preload the next 3 candidate portraits so swaps are instant.
   const candidates = filteredRoles().filter((role) => role.person.image).slice(0, 50);
-  shuffle(candidates)
-    .slice(0, 3)
-    .forEach((role) => preloadImage(role.person.image));
+  shuffle(candidates).slice(0, 3).forEach((role) => preloadImage(role.person.image));
 }
 
 function preloadImage(url) {
@@ -498,7 +502,6 @@ function preloadImage(url) {
 }
 
 /* ── Profile + stats ─────────────────────────────────────── */
-
 function updateProfile(correct, role) {
   const profile = state.profile;
   profile.played += 1;
@@ -525,34 +528,23 @@ function updateProfile(correct, role) {
 }
 
 function renderStats(options = {}) {
-  const { played, correct, streak } = state.profile;
-  setStat(els.statStreak, streak);
-  setStat(els.statScore, correct, options.pop === "score");
-  els.statAccuracy.textContent = played ? `${Math.round((correct / played) * 100)}%` : "0%";
-}
-
-function setStat(el, value, pop = false) {
-  const previous = el.textContent;
-  el.textContent = value;
-  if (pop && String(value) !== previous) {
-    const parent = el.closest(".hero-stat");
-    if (!parent) return;
-    parent.classList.add("is-pop");
-    setTimeout(() => parent.classList.remove("is-pop"), 320);
+  const { streak } = state.profile;
+  if (els.railStreak && els.railStreakValue) {
+    if (streak >= 2) {
+      els.railStreak.hidden = false;
+      els.railStreakValue.textContent = streak;
+      paintIcons(els.railStreak);
+    } else {
+      els.railStreak.hidden = true;
+    }
   }
 }
 
-function renderRoundProgress(options = {}) {
+function renderRoundProgress() {
   const round = state.profile.currentRound || { played: 0, correct: 0 };
   const pct = Math.min(100, (round.played / ROUND_SIZE) * 100);
   els.roundFill.style.width = `${pct}%`;
-  els.roundLabel.textContent = `${round.played} / ${ROUND_SIZE}`;
-  if (options.pop) {
-    els.roundFill.parentElement.animate(
-      [{ transform: "scale(1)" }, { transform: "scale(1.03)" }, { transform: "scale(1)" }],
-      { duration: 240, easing: "ease-out" },
-    );
-  }
+  els.roundLabel.textContent = `${round.played + 1} / ${ROUND_SIZE}`;
 }
 
 function renderStatsView() {
@@ -572,11 +564,11 @@ function renderStatsView() {
     <tbody>${rows.join("")}</tbody>
   `;
 
-  renderDataPanel();
+  renderDataList();
 }
 
-function renderDataPanel() {
-  if (!state.data) return;
+function renderDataList() {
+  if (!state.data || !els.dataList) return;
   const currentRoles = state.roles.filter((role) => !role.end).length;
   els.dataList.innerHTML = `
     <li><span>Personer</span><strong>${state.data.stats.people}</strong></li>
@@ -584,13 +576,17 @@ function renderDataPanel() {
     <li><span>Bilder</span><strong>${state.data.stats.images}</strong></li>
     <li><span>Regjeringer</span><strong>${state.data.stats.governments}</strong></li>
     <li><span>Poster</span><strong>${state.data.stats.offices}</strong></li>
-    <li><span>Nåværende roller</span><strong>${currentRoles}</strong></li>
-    <li><span>Generert</span><strong>${escapeHtml(formatGeneratedDate(state.data.generatedAt))}</strong></li>
+    <li><span>Nåværende</span><strong>${currentRoles}</strong></li>
   `;
 }
 
-/* ── Learn view ──────────────────────────────────────────── */
+function renderFootStats() {
+  if (!state.data || !els.footStats) return;
+  const { people, roles, images, governments } = state.data.stats;
+  els.footStats.textContent = `${people} personer · ${roles} roller · ${images} bilder · ${governments} regjeringer · oppdatert ${formatGeneratedDate(state.data.generatedAt)}`;
+}
 
+/* ── Learn view ──────────────────────────────────────────── */
 function renderLearn() {
   if (!state.data) return;
   const query = normalize(els.learnSearch.value);
@@ -640,7 +636,6 @@ function renderPersonCard(person) {
 }
 
 /* ── Helpers ─────────────────────────────────────────────── */
-
 function filteredRoles() {
   return state.roles.filter((role) => rolePassesEra(role, state.era));
 }
@@ -757,14 +752,13 @@ function showToast(message, tone = "") {
   els.toast.classList.remove("is-success", "is-fail", "is-shown");
   if (tone === "success") els.toast.classList.add("is-success");
   if (tone === "fail") els.toast.classList.add("is-fail");
-  // force reflow to retrigger transition
   void els.toast.offsetWidth;
   els.toast.classList.add("is-shown");
   clearTimeout(showToast._timeout);
   showToast._timeout = setTimeout(() => {
     els.toast.classList.remove("is-shown");
     setTimeout(() => (els.toast.hidden = true), 280);
-  }, 2200);
+  }, 2000);
 }
 
 function defaultProfile() {
@@ -798,7 +792,5 @@ function loadProfile() {
 function saveProfile() {
   try {
     localStorage.setItem(STORE_KEY, JSON.stringify(state.profile));
-  } catch {
-    /* storage may be unavailable in some sandboxes */
-  }
+  } catch {}
 }
