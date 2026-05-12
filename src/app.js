@@ -28,9 +28,9 @@ const MODES = {
 
 const ERAS = {
   all: { label: "Alle år" },
-  current: { label: "Siste 25" },
-  postwar: { label: "1945→" },
-  interwar: { label: "1905–45" },
+  current: { label: "Siste 25 år" },
+  postwar: { label: "1945 →" },
+  interwar: { label: "1905–1945" },
   union: { label: "1814–1905" },
 };
 
@@ -55,7 +55,7 @@ const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 
 const els = {
   modeList: $("#modeList"),
-  eraList: $("#eraList"),
+  eraSelect: $("#eraSelect"),
   choices: $("#choices"),
   portrait: $(".portrait"),
   portraitImg: $("#portraitImg"),
@@ -66,6 +66,7 @@ const els = {
   badgeMode: $("#badgeMode"),
   badgeYear: $("#badgeYear"),
   badgeGov: $("#badgeGov"),
+  badgeGovSep: $("#badgeGovSep"),
   answerPanel: $("#answerPanel"),
   answerKicker: $("#answerKicker"),
   answerTitle: $("#answerTitle"),
@@ -118,7 +119,7 @@ async function init() {
   );
 
   buildModeChips();
-  buildEraChips();
+  buildEraSelect();
   buildPartyFilter();
   bindEvents();
   renderStats();
@@ -201,22 +202,12 @@ function buildModeChips() {
   });
 }
 
-function buildEraChips() {
-  els.eraList.innerHTML = Object.entries(ERAS)
-    .map(
-      ([key, era]) => `
-        <button class="chip ${key === state.era ? "is-active" : ""}" type="button" data-era="${key}">
-          ${escapeHtml(era.label)}
-        </button>
-      `,
-    )
-    .join("");
-  els.eraList.querySelectorAll("button").forEach((button) => {
-    button.addEventListener("click", () => {
-      state.era = button.dataset.era;
-      els.eraList.querySelectorAll("button").forEach((b) => b.classList.toggle("is-active", b === button));
-      nextQuestion();
-    });
+function buildEraSelect() {
+  if (!els.eraSelect) return;
+  els.eraSelect.value = state.era;
+  els.eraSelect.addEventListener("change", () => {
+    state.era = els.eraSelect.value;
+    nextQuestion();
   });
 }
 
@@ -335,8 +326,10 @@ function renderQuestion(question) {
   if (role.government) {
     els.badgeGov.textContent = role.government;
     els.badgeGov.hidden = false;
+    if (els.badgeGovSep) els.badgeGovSep.hidden = false;
   } else {
     els.badgeGov.hidden = true;
+    if (els.badgeGovSep) els.badgeGovSep.hidden = true;
   }
   els.questionText.textContent = question.prompt;
   els.questionHint.textContent = question.hint;
@@ -459,13 +452,30 @@ function renderAnswer(correct, role) {
 }
 
 function renderPortraitTag(role) {
-  const partyMeta = role.party ? state.data.parties[role.party] : null;
-  const mark = partyMeta?.logo
-    ? `<img src="${escapeAttr(partyMeta.logo)}" alt="">`
-    : `<span class="party-dot" style="background:${escapeAttr(partyMeta?.color || "#8a94c2")}"></span>`;
+  const badge = partyBadge(role.party, "md");
   const name = escapeHtml(role.person.name);
-  const partyLabel = role.party ? `${escapeHtml(partyName(role.party))}` : "Ukjent parti";
-  return `${mark}<span>${name} · ${partyLabel}</span>`;
+  const partyLabel = role.party ? escapeHtml(partyName(role.party)) : "Uavhengig";
+  return `${badge}<span class="tag-text">${name} · ${partyLabel}</span>`;
+}
+
+function partyBadge(code, size = "sm") {
+  const meta = code ? state.data?.parties?.[code] : null;
+  const color = meta?.color || "#9a9a9a";
+  const logo = meta?.logo || meta?.logoSource || "";
+  const label = code ? shortPartyCode(code) : "?";
+  const style = `background:${escapeAttr(color)}`;
+  const sizeClass = size === "md" ? "size-md" : size === "lg" ? "size-lg" : "size-sm";
+  if (logo) {
+    return `<span class="party-badge ${sizeClass}" style="${style}" title="${escapeAttr(partyName(code))}"><img src="${escapeAttr(logo)}" alt="" loading="lazy" decoding="async" onerror="this.remove()"></span>`;
+  }
+  return `<span class="party-badge ${sizeClass}" style="${style}" title="${escapeAttr(partyName(code))}">${escapeHtml(label)}</span>`;
+}
+
+function shortPartyCode(code) {
+  if (!code) return "?";
+  const trimmed = String(code).replace(/\./g, "");
+  if (trimmed.length <= 3) return trimmed;
+  return trimmed.slice(0, 2);
 }
 
 function preloadUpcoming() {
@@ -613,10 +623,6 @@ function renderLearn() {
 function renderPersonCard(person) {
   const latest = [...(person.roles || [])].sort((a, b) => (b.start || "").localeCompare(a.start || ""))[0];
   const party = latest?.party;
-  const partyMeta = party ? state.data.parties[party] : null;
-  const mark = partyMeta?.logo
-    ? `<img class="party-logo" src="${escapeAttr(partyMeta.logo)}" alt="">`
-    : `<span class="party-dot" style="background:${escapeAttr(partyMeta?.color || "#8a94c2")}"></span>`;
   const media = person.image
     ? `<img src="${escapeAttr(person.image)}" alt="Portrett av ${escapeAttr(person.name)}" loading="lazy" decoding="async">`
     : `<div class="person-mini">${escapeHtml(initials(person.name))}</div>`;
@@ -624,10 +630,10 @@ function renderPersonCard(person) {
     <article class="person">
       <div class="person-media">${media}</div>
       <div class="person-body">
-        ${party ? `<span class="party-chip">${mark}${escapeHtml(partyName(party))}</span>` : ""}
         <h3>${escapeHtml(person.name)}</h3>
-        <p>${escapeHtml(latest?.title || "Statsråd")} · ${escapeHtml(dateLabel(latest || {}))}</p>
-        ${latest?.government ? `<p>${escapeHtml(latest.government)}</p>` : ""}
+        <p>${escapeHtml(latest?.title || "Statsråd")}</p>
+        <p>${escapeHtml(dateLabel(latest || {}))}</p>
+        ${party ? `<span class="person-party">${partyBadge(party, "sm")}${escapeHtml(partyName(party))}</span>` : ""}
       </div>
     </article>
   `;

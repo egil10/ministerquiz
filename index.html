@@ -3,33 +3,33 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#0b1020" />
+    <meta name="theme-color" content="#ffffff" />
     <meta
       name="description"
       content="Norsk ministerquiz med statsråder, regjeringer, partier, portretter og årstall. Spill runder, lær historie og test deg selv."
     />
     <title>Ministerquiz · norsk regjeringshistorie</title>
     <link rel="preconnect" href="https://upload.wikimedia.org" crossorigin />
+    <link rel="preconnect" href="https://commons.wikimedia.org" crossorigin />
     <link rel="preload" href="/data/ministers.json" as="fetch" crossorigin="anonymous" />
     <link rel="stylesheet" href="/src/styles.css" />
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230b1020'/%3E%3Ctext x='50%25' y='56%25' text-anchor='middle' font-family='Inter,sans-serif' font-size='34' font-weight='800' fill='%23fef9c3'%3EM%3C/text%3E%3C/svg%3E" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%230a0a0a'/%3E%3Ctext x='50%25' y='58%25' text-anchor='middle' font-family='Inter,sans-serif' font-size='38' font-weight='800' fill='white'%3EM%3C/text%3E%3C/svg%3E" />
   </head>
   <body>
     <a class="skip-link" href="#stage">Hopp til quizen</a>
 
     <header class="topbar">
-      <div class="brand">
-        <span class="brand-mark" aria-hidden="true">M</span>
-        <div>
-          <p class="brand-eyebrow">Norsk regjeringshistorie · siden 1814</p>
+      <div class="topbar-inner">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">M</span>
           <h1>Ministerquiz</h1>
         </div>
+        <nav class="view-switch" role="tablist" aria-label="Visning">
+          <button class="view-tab is-active" type="button" data-view="play" role="tab">Spill</button>
+          <button class="view-tab" type="button" data-view="learn" role="tab">Bla</button>
+          <button class="view-tab" type="button" data-view="stats" role="tab">Stats</button>
+        </nav>
       </div>
-      <nav class="view-switch" role="tablist" aria-label="Visning">
-        <button class="view-tab is-active" type="button" data-view="play" role="tab">Spill</button>
-        <button class="view-tab" type="button" data-view="learn" role="tab">Bla</button>
-        <button class="view-tab" type="button" data-view="stats" role="tab">Stats</button>
-      </nav>
     </header>
 
     <main class="app">
@@ -50,20 +50,23 @@
           <span class="hero-stat-label">Runde</span>
           <div class="round-progress" aria-hidden="true">
             <span id="roundFill" class="round-progress-fill"></span>
-            <span id="roundLabel" class="round-progress-label">1 / 10</span>
+            <span id="roundLabel" class="round-progress-label">0 / 10</span>
           </div>
         </div>
       </section>
 
       <section class="filters" aria-label="Filtre">
         <div class="chip-row" role="tablist" aria-label="Modus">
-          <span class="chip-row-label">Modus</span>
           <div class="chip-row-list" id="modeList"></div>
         </div>
-        <div class="chip-row" aria-label="Periode">
-          <span class="chip-row-label">Periode</span>
-          <div class="chip-row-list" id="eraList"></div>
-        </div>
+        <span class="filters-sep" aria-hidden="true"></span>
+        <select class="era-select" id="eraSelect" aria-label="Periode">
+          <option value="all">Alle år</option>
+          <option value="current">Siste 25 år</option>
+          <option value="postwar">1945 →</option>
+          <option value="interwar">1905–1945</option>
+          <option value="union">1814–1905</option>
+        </select>
       </section>
 
       <section id="stage" class="stage" aria-live="polite">
@@ -79,7 +82,9 @@
           <div class="card">
             <div class="card-meta">
               <span class="badge badge-mode" id="badgeMode">Portrett</span>
+              <span class="sep" aria-hidden="true"></span>
               <span class="badge" id="badgeYear">...</span>
+              <span class="sep" aria-hidden="true" id="badgeGovSep" hidden></span>
               <span class="badge" id="badgeGov" hidden></span>
             </div>
             <h2 id="questionText" class="question">Laster quiz…</h2>
@@ -106,13 +111,13 @@
         <section id="learnView" class="learn" hidden>
           <div class="learn-toolbar">
             <label class="search">
-              <svg viewBox="0 0 24 24" aria-hidden="true" width="18" height="18"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M21 21l-4.3-4.3M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z"/></svg>
+              <svg viewBox="0 0 24 24" aria-hidden="true" width="16" height="16"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M21 21l-4.3-4.3M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z"/></svg>
               <input id="learnSearch" type="search" placeholder="Søk navn, parti, post, regjering" autocomplete="off" />
             </label>
-            <select id="partyFilter">
+            <select class="toolbar-select" id="partyFilter">
               <option value="all">Alle parti</option>
             </select>
-            <select id="learnEra">
+            <select class="toolbar-select" id="learnEra">
               <option value="all">Alle år</option>
               <option value="current">Siste 25 år</option>
               <option value="postwar">1945 →</option>
@@ -144,12 +149,12 @@
               <strong id="statBest">0</strong>
             </div>
           </div>
-          <div class="stats-card stats-card-wide">
-            <span class="stats-card-label">Per modus</span>
+          <div class="stats-block">
+            <span class="stats-block-label">Per modus</span>
             <table class="mode-table" id="modeTable"></table>
           </div>
-          <div class="stats-card stats-card-wide">
-            <span class="stats-card-label">Datagrunnlag</span>
+          <div class="stats-block">
+            <span class="stats-block-label">Datagrunnlag</span>
             <ul class="data-list" id="dataList"></ul>
           </div>
           <div class="stats-actions">
