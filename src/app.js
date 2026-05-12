@@ -486,8 +486,8 @@ function shortPartyCode(code) {
 }
 
 function preloadUpcoming() {
-  const candidates = filteredRoles().filter((role) => role.person.image).slice(0, 50);
-  shuffle(candidates).slice(0, 3).forEach((role) => preloadImage(role.person.image));
+  const candidates = filteredRoles().filter((role) => role.person.image);
+  shuffle(candidates).slice(0, 8).forEach((role) => preloadImage(role.person.image));
 }
 
 function preloadImage(url) {
