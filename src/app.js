@@ -144,13 +144,15 @@ const els = {
   learnView: $("#learnView"),
   statsView: $("#statsView"),
   controls: $("#controls"),
-  viewSwitch: $("#viewSwitch"),
-  viewTabs: $$(".view-tab"),
   brand: $(".brand"),
   brandPack: $("#brandPack"),
-  packSwitch: $("#packSwitch"),
-  packSwitchIcon: $("#packSwitchIcon"),
-  themeToggle: $("#themeToggle"),
+  menuTrigger: $("#menuTrigger"),
+  menuTriggerLabel: $("#menuTriggerLabel"),
+  menuPanel: $("#menuPanel"),
+  menuPackList: $("#menuPackList"),
+  menuViewItems: $$("#menuPanel [data-view]"),
+  menuThemeItems: $$("#menuPanel [data-theme]"),
+  menuAdvanceItems: $$("#menuPanel [data-advance]"),
   modeList: $("#modeList"),
   eraSelect: $("#eraSelect"),
   choices: $("#choices"),
@@ -191,10 +193,17 @@ const els = {
 
 const ROUND_SIZE = 10;
 const THEME_KEY = "mq.theme";
+const ADVANCE_KEY = "mq.advance";
+const DEFAULT_PACK = "no-ministers";
+const ADVANCE_OPTIONS = new Set(["manual", "2000", "3000"]);
 const profileKey = (id) => `mq.profile.${id}.v3`;
+
+const VIEW_LABELS_NO = { play: "Spill", learn: "Bla", stats: "Stats" };
 
 paintIcons();
 initTheme();
+initAdvance();
+buildMenu();
 bindGlobalEvents();
 
 window.addEventListener("hashchange", route);
@@ -202,14 +211,26 @@ route();
 
 /* ── Routing ──────────────────────────────────────────────── */
 function route() {
-  const hash = location.hash.replace(/^#/, "");
+  const raw = location.hash;
+  const hash = raw.replace(/^#/, "");
   const parts = hash.split("/").filter(Boolean);
   const packId = parts[0] && PACKS[parts[0]] ? parts[0] : null;
-  if (!packId) {
+  if (packId) {
+    loadPack(packId).catch((err) => {
+      console.error(err);
+      showToast("Klarte ikke laste pakken", "fail");
+      showHub();
+    });
+    return;
+  }
+  // Explicit hub request: "#/hub". Empty hash or "#/" defaults to Norway.
+  if (parts[0] === "hub") {
     showHub();
     return;
   }
-  loadPack(packId).catch((err) => {
+  // Default: load Norway and rewrite the URL silently.
+  history.replaceState({}, "", `#/${DEFAULT_PACK}`);
+  loadPack(DEFAULT_PACK).catch((err) => {
     console.error(err);
     showToast("Klarte ikke laste pakken", "fail");
     showHub();
@@ -234,9 +255,8 @@ function showHub() {
   els.learnView.hidden = true;
   els.statsView.hidden = true;
   els.controls.hidden = true;
-  els.viewSwitch.hidden = true;
-  els.packSwitch.hidden = true;
   els.brandPack.textContent = "";
+  els.menuTriggerLabel.textContent = "Velg";
 
   els.hubGrid.innerHTML = Object.values(PACKS)
     .map((pack) => packCard(pack))
@@ -244,8 +264,8 @@ function showHub() {
   els.hubGrid.querySelectorAll("[data-pack]").forEach((card) => {
     card.addEventListener("click", () => go(`/${card.dataset.pack}`));
   });
-  // queued data fetch hints
   Object.values(PACKS).forEach((pack) => warmCache(pack));
+  syncMenuChecked();
 }
 
 function packCard(pack) {
@@ -286,9 +306,6 @@ async function loadPack(packId) {
   document.documentElement.style.setProperty("--accent-soft", pack.accentSoft);
   document.body.dataset.pack = packId;
   els.brandPack.textContent = pack.title;
-  els.packSwitchIcon.textContent = pack.icon;
-  els.packSwitch.hidden = false;
-  els.viewSwitch.hidden = false;
   els.hubView.hidden = true;
   els.playView.hidden = true;
   els.learnView.hidden = true;
@@ -372,7 +389,9 @@ function flagLargeUrl(country) {
 /* ── World adapter ────────────────────────────────────────── */
 function buildItemsWorld(data) {
   const list = [];
+  state.worldCountryByName = new Map();
   for (const country of data.countries) {
+    state.worldCountryByName.set(country.name, country);
     for (const leader of country.leaders) {
       list.push({
         _kind: "world",
@@ -392,18 +411,119 @@ function buildItemsWorld(data) {
 
 /* ── Theme ────────────────────────────────────────────────── */
 function initTheme() {
-  const stored = safeStorage.get(THEME_KEY);
-  const prefersDark = window.matchMedia?.("(prefers-color-scheme: dark)").matches;
-  applyTheme(stored || (prefersDark ? "dark" : "light"));
-  els.themeToggle?.addEventListener("click", () => {
-    const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
-    applyTheme(next);
-    safeStorage.set(THEME_KEY, next);
+  applyTheme(safeStorage.get(THEME_KEY) || "auto");
+  // Respond to system theme changes when in auto mode
+  window.matchMedia?.("(prefers-color-scheme: dark)")?.addEventListener?.("change", () => {
+    if ((safeStorage.get(THEME_KEY) || "auto") === "auto") applyTheme("auto");
   });
 }
-function applyTheme(t) {
-  if (t === "dark") document.documentElement.setAttribute("data-theme", "dark");
-  else document.documentElement.removeAttribute("data-theme");
+function applyTheme(mode) {
+  if (mode === "dark") {
+    document.documentElement.setAttribute("data-theme", "dark");
+  } else if (mode === "light") {
+    document.documentElement.removeAttribute("data-theme");
+  } else {
+    const prefersDark = window.matchMedia?.("(prefers-color-scheme: dark)").matches;
+    if (prefersDark) document.documentElement.setAttribute("data-theme", "dark");
+    else document.documentElement.removeAttribute("data-theme");
+  }
+}
+
+/* ── Auto-advance ─────────────────────────────────────────── */
+function initAdvance() {
+  const v = safeStorage.get(ADVANCE_KEY);
+  state.advance = ADVANCE_OPTIONS.has(v) ? v : "manual";
+}
+function setAdvance(value) {
+  if (!ADVANCE_OPTIONS.has(value)) return;
+  state.advance = value;
+  safeStorage.set(ADVANCE_KEY, value);
+  syncMenuChecked();
+}
+
+/* ── Menu ─────────────────────────────────────────────────── */
+function buildMenu() {
+  els.menuPackList.innerHTML = Object.values(PACKS)
+    .map(
+      (p) => `
+        <button class="menu-item menu-item-pack" type="button" data-pack="${p.id}" role="menuitemradio">
+          <span class="menu-item-icon" aria-hidden="true">${p.icon}</span>
+          <span class="menu-item-text">${escapeHtml(p.title)}</span>
+        </button>`,
+    )
+    .join("");
+  els.menuPackList.querySelectorAll("[data-pack]").forEach((b) => {
+    b.addEventListener("click", () => {
+      closeMenu();
+      if (b.dataset.pack !== state.packId) go(`/${b.dataset.pack}`);
+    });
+  });
+  els.menuViewItems.forEach((b) => {
+    b.addEventListener("click", () => {
+      closeMenu();
+      switchView(b.dataset.view);
+    });
+  });
+  els.menuThemeItems.forEach((b) => {
+    b.addEventListener("click", () => {
+      const t = b.dataset.theme;
+      applyTheme(t);
+      safeStorage.set(THEME_KEY, t);
+      syncMenuChecked();
+    });
+  });
+  els.menuAdvanceItems.forEach((b) => {
+    b.addEventListener("click", () => setAdvance(b.dataset.advance));
+  });
+
+  els.menuTrigger.addEventListener("click", (e) => {
+    e.stopPropagation();
+    toggleMenu();
+  });
+  document.addEventListener("click", (e) => {
+    if (els.menuPanel.hidden) return;
+    if (els.menuPanel.contains(e.target) || els.menuTrigger.contains(e.target)) return;
+    closeMenu();
+  });
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !els.menuPanel.hidden) closeMenu();
+  });
+  syncMenuChecked();
+}
+
+function toggleMenu() { els.menuPanel.hidden ? openMenu() : closeMenu(); }
+function openMenu()   { els.menuPanel.hidden = false; els.menuTrigger.setAttribute("aria-expanded", "true"); syncMenuChecked(); }
+function closeMenu()  { els.menuPanel.hidden = true;  els.menuTrigger.setAttribute("aria-expanded", "false"); }
+
+function syncMenuChecked() {
+  els.menuPackList.querySelectorAll("[data-pack]").forEach((b) => {
+    const on = b.dataset.pack === state.packId;
+    b.setAttribute("aria-checked", String(on));
+    b.classList.toggle("is-active", on);
+  });
+  els.menuViewItems.forEach((b) => {
+    const on = b.dataset.view === state.view && state.pack != null;
+    b.setAttribute("aria-checked", String(on));
+    b.classList.toggle("is-active", on);
+    b.disabled = state.pack == null;
+  });
+  const themeCur = safeStorage.get(THEME_KEY) || "auto";
+  els.menuThemeItems.forEach((b) => {
+    const on = b.dataset.theme === themeCur;
+    b.setAttribute("aria-checked", String(on));
+    b.classList.toggle("is-active", on);
+  });
+  els.menuAdvanceItems.forEach((b) => {
+    const on = b.dataset.advance === state.advance;
+    b.setAttribute("aria-checked", String(on));
+    b.classList.toggle("is-active", on);
+  });
+  // trigger label = current view label, or pack title on hub
+  if (state.pack) {
+    els.menuTriggerLabel.textContent = VIEW_LABELS_NO[state.view] || "Spill";
+  } else {
+    els.menuTriggerLabel.textContent = "Velg";
+  }
 }
 
 /* ── Global event bindings ────────────────────────────────── */
@@ -418,12 +538,6 @@ function bindGlobalEvents() {
     renderStatsView();
     showToast("Progresjon nullstilt");
   });
-
-  els.viewTabs.forEach((tab) => {
-    tab.addEventListener("click", () => switchView(tab.dataset.view));
-  });
-
-  els.packSwitch.addEventListener("click", () => go("/"));
 
   els.portraitImg.addEventListener("load", () => {
     els.portraitImg.classList.add("is-ready");
@@ -460,13 +574,13 @@ function bindLearnFilters() {
 function switchView(view) {
   if (!state.pack) return;
   state.view = view;
-  els.viewTabs.forEach((t) => t.classList.toggle("is-active", t.dataset.view === view));
   els.playView.hidden = view !== "play";
   els.learnView.hidden = view !== "learn";
   els.statsView.hidden = view !== "stats";
   els.controls.hidden = view !== "play";
   if (view === "learn") renderLearn();
   if (view === "stats") renderStatsView();
+  syncMenuChecked();
 }
 
 /* ── Mode / era chips ─────────────────────────────────────── */
@@ -507,6 +621,12 @@ function buildEraSelect() {
 
 /* ── Question pipeline ────────────────────────────────────── */
 function nextQuestion() {
+  if (state.advanceTimer) {
+    clearTimeout(state.advanceTimer);
+    state.advanceTimer = null;
+  }
+  els.nextBtn.classList.remove("is-counting");
+  els.nextBtn.style.removeProperty("--countdown");
   state.answered = false;
   els.answerPanel.classList.remove("is-shown", "is-right", "is-wrong");
   els.answerTitle.innerHTML = "&nbsp;";
@@ -698,6 +818,7 @@ function questionWorld(item) {
       choices: choiceSet(country.name, allCountryNames()),
       prompt: "Hvilket land leder denne personen?",
       hint: `${leader.name} · ${WORLD_ROLE_LABELS_NO[primaryRole] || "Leder"}`,
+      renderChoiceLead: choiceFlagLead,
     };
   }
   if (state.mode === "leader") {
@@ -733,6 +854,7 @@ function questionWorld(item) {
     choices: choiceSet(country.name, allCountryNames()),
     prompt: "Hvilket land har dette flagget?",
     hint: country.capital ? `Hovedstad: ${country.capital}` : "",
+    renderChoiceLead: choiceFlagLead,
   };
 }
 
@@ -741,6 +863,11 @@ function allLeaderNames() {
 }
 function allCountryNames() {
   return [...new Set(state.items.filter((i) => i._kind === "world").map((i) => i.country.name))];
+}
+function choiceFlagLead(countryName) {
+  const c = state.worldCountryByName?.get(countryName);
+  if (!c) return "";
+  return flagBadgeHtml(c, "md");
 }
 
 /* ── Choice generation ───────────────────────────────────── */
@@ -805,8 +932,10 @@ function renderChoices(q) {
     b.type = "button";
     b.dataset.value = choice;
     const text = q.formatChoice ? q.formatChoice(choice) : choice;
+    const lead = q.renderChoiceLead ? q.renderChoiceLead(choice) : "";
     b.innerHTML = `
       <span class="choice-key">${i + 1}</span>
+      ${lead}
       <span class="choice-text">${escapeHtml(text)}</span>
       <span class="icon choice-icon" aria-hidden="true"></span>
     `;
@@ -844,6 +973,27 @@ function onAnswer(btn, value) {
     showConfetti();
     showToast(`${state.profile.streak} på rad`, "success");
   }
+
+  scheduleAutoAdvance();
+}
+
+function scheduleAutoAdvance() {
+  if (state.advanceTimer) {
+    clearTimeout(state.advanceTimer);
+    state.advanceTimer = null;
+  }
+  els.nextBtn.classList.remove("is-counting");
+  els.nextBtn.style.removeProperty("--countdown");
+  if (state.advance === "manual") return;
+  const ms = Number(state.advance);
+  if (!Number.isFinite(ms) || ms <= 0) return;
+  els.nextBtn.style.setProperty("--countdown", `${ms}ms`);
+  els.nextBtn.classList.add("is-counting");
+  state.advanceTimer = setTimeout(() => {
+    state.advanceTimer = null;
+    els.nextBtn.classList.remove("is-counting");
+    if (state.view === "play" && state.pack && state.answered) nextQuestion();
+  }, ms);
 }
 
 function renderAnswer(correct, q) {

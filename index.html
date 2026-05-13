@@ -32,7 +32,7 @@
 
     <header class="topbar">
       <div class="topbar-inner">
-        <a class="brand" href="#/" data-link="hub">
+        <a class="brand" href="#/hub" data-link="hub">
           <span class="brand-mark" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
           </span>
@@ -42,22 +42,48 @@
           </span>
         </a>
 
-        <nav class="view-switch" id="viewSwitch" role="tablist" aria-label="Visning" hidden>
-          <button class="view-tab is-active" type="button" data-view="play" role="tab">Spill</button>
-          <button class="view-tab" type="button" data-view="learn" role="tab">Bla</button>
-          <button class="view-tab" type="button" data-view="stats" role="tab">Stats</button>
-        </nav>
-
         <div class="topbar-actions">
-          <button class="pack-switch" id="packSwitch" type="button" hidden>
-            <span class="pack-switch-icon" id="packSwitchIcon"></span>
-            <span class="pack-switch-label">Bytt quiz</span>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+          <button class="menu-trigger" id="menuTrigger" type="button" aria-haspopup="true" aria-expanded="false" aria-label="Meny">
+            <span class="menu-trigger-current" id="menuTriggerLabel">Spill</span>
+            <span class="icon icon-menu" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
+            </span>
           </button>
-          <button class="theme-toggle" id="themeToggle" type="button" aria-label="Bytt tema">
-            <span class="icon icon-sun" data-icon="sun" aria-hidden="true"></span>
-            <span class="icon icon-moon" data-icon="moon" aria-hidden="true"></span>
-          </button>
+          <div class="menu-panel" id="menuPanel" hidden role="menu">
+            <div class="menu-section" data-section="pack">
+              <span class="menu-label">Quiz</span>
+              <div class="menu-list" id="menuPackList"></div>
+            </div>
+            <div class="menu-section" data-section="view">
+              <span class="menu-label">Visning</span>
+              <div class="menu-list">
+                <button class="menu-item" type="button" data-view="play" role="menuitemradio" aria-checked="true">Spill</button>
+                <button class="menu-item" type="button" data-view="learn" role="menuitemradio">Bla</button>
+                <button class="menu-item" type="button" data-view="stats" role="menuitemradio">Stats</button>
+              </div>
+            </div>
+            <div class="menu-section" data-section="advance">
+              <span class="menu-label">Neste spørsmål</span>
+              <div class="menu-list">
+                <button class="menu-item" type="button" data-advance="manual" role="menuitemradio">Manuell</button>
+                <button class="menu-item" type="button" data-advance="2000"   role="menuitemradio">Auto · 2 s</button>
+                <button class="menu-item" type="button" data-advance="3000"   role="menuitemradio">Auto · 3 s</button>
+              </div>
+            </div>
+            <div class="menu-section" data-section="theme">
+              <span class="menu-label">Tema</span>
+              <div class="menu-list">
+                <button class="menu-item" type="button" data-theme="light" role="menuitemradio">Lyst</button>
+                <button class="menu-item" type="button" data-theme="dark"  role="menuitemradio">Mørkt</button>
+                <button class="menu-item" type="button" data-theme="auto"  role="menuitemradio">Auto</button>
+              </div>
+            </div>
+            <div class="menu-footer">
+              <a href="https://www.regjeringen.no" target="_blank" rel="noopener">regjeringen.no</a>
+              <a href="https://www.wikidata.org" target="_blank" rel="noopener">Wikidata</a>
+            </div>
+          </div>
+          <button class="theme-toggle" id="themeToggle" type="button" hidden aria-hidden="true" tabindex="-1"></button>
         </div>
       </div>
     </header>
@@ -192,17 +218,7 @@
     <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
     <footer class="foot">
-      <details class="foot-disclosure">
-        <summary>Om</summary>
-        <p>
-          Data fra <a href="https://www.regjeringen.no" rel="noopener" target="_blank">regjeringen.no</a>,
-          <a href="https://www.wikidata.org" rel="noopener" target="_blank">Wikidata</a> og
-          <a href="https://commons.wikimedia.org" rel="noopener" target="_blank">Wikimedia Commons</a>.
-          Portretter er lokalt cachet for raske svar selv på treg nett. Ikoner via
-          <a href="https://lucide.dev" rel="noopener" target="_blank">lucide.dev</a>.
-        </p>
-        <p id="footStats" class="foot-stats"></p>
-      </details>
+      <p id="footStats" class="foot-stats"></p>
     </footer>
 
     <script type="module" src="/src/app.js"></script>
