@@ -910,6 +910,43 @@ a {
 .party-badge.size-md { --pb-size: 24px; }
 .party-badge.size-lg { --pb-size: 32px; }
 
+/* ── Flag badge (rectangular, crisp via flagcdn) ─────────── */
+.flag-badge {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--bg-soft);
+  box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.18), 0 1px 2px rgba(0, 0, 0, 0.08);
+  line-height: 0;
+  --fw: 24px;
+  --fh: 18px;
+  width: var(--fw);
+  height: var(--fh);
+}
+:root[data-theme="dark"] .flag-badge {
+  box-shadow: 0 0 0 0.5px rgba(255, 255, 255, 0.22), 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+.flag-badge img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.flag-badge.size-sm { --fw: 18px; --fh: 14px; }
+.flag-badge.size-md { --fw: 24px; --fh: 18px; }
+.flag-badge.size-lg { --fw: 32px; --fh: 24px; }
+.flag-badge.is-text {
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: var(--muted);
+  background: var(--bg-soft);
+  line-height: 1;
+}
+.flag-badge.has-svg { background: #fff; }
+:root[data-theme="dark"] .flag-badge.has-svg { background: #f4f4f0; }
+
 /* ── Learn view ──────────────────────────────────────────── */
 .learn-toolbar {
   display: grid;

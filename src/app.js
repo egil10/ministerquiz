@@ -329,6 +329,46 @@ function buildItemsNorway(data) {
   );
 }
 
+/* ── Flag helpers (prefer flagcdn for crisp small + big rendering) ─── */
+const FLAGCDN_BADGE_SIZES = {
+  sm: { base: "24x18", x15: "36x27", x2: "48x36", w: 18, h: 14 },
+  md: { base: "32x24", x15: "48x36", x2: "64x48", w: 24, h: 18 },
+  lg: { base: "48x36", x15: "72x54", x2: "96x72", w: 32, h: 24 },
+};
+
+function flagcdnFor(country) {
+  const iso2 = (country?.iso2 || "").toLowerCase();
+  if (!iso2 || !/^[a-z]{2}$/.test(iso2)) return null;
+  return iso2;
+}
+
+function flagBadgeHtml(country, size = "sm") {
+  const iso = flagcdnFor(country);
+  const meta = FLAGCDN_BADGE_SIZES[size] || FLAGCDN_BADGE_SIZES.sm;
+  const sizeClass = size === "lg" ? "size-lg" : size === "md" ? "size-md" : "size-sm";
+  if (iso) {
+    return `<span class="flag-badge ${sizeClass}" title="${escapeAttr(country.name)}">
+      <img src="https://flagcdn.com/${meta.base}/${iso}.png"
+           srcset="https://flagcdn.com/${meta.x15}/${iso}.png 1.5x, https://flagcdn.com/${meta.x2}/${iso}.png 2x"
+           width="${meta.w}" height="${meta.h}" loading="lazy" decoding="async" alt="">
+    </span>`;
+  }
+  // Fallback: local SVG, then text monogram
+  if (country?.flag) {
+    return `<span class="flag-badge has-svg ${sizeClass}" title="${escapeAttr(country?.name || "")}">
+      <img src="${escapeAttr(country.flag)}" width="${meta.w}" height="${meta.h}" loading="lazy" decoding="async" alt="">
+    </span>`;
+  }
+  const tag = (country?.iso2 || country?.iso3 || country?.name || "?").slice(0, 2).toUpperCase();
+  return `<span class="flag-badge ${sizeClass} is-text" title="${escapeAttr(country?.name || "")}">${escapeHtml(tag)}</span>`;
+}
+
+function flagLargeUrl(country) {
+  const iso = flagcdnFor(country);
+  if (iso) return `https://flagcdn.com/${iso}.svg`;
+  return country?.flag || null;
+}
+
 /* ── World adapter ────────────────────────────────────────── */
 function buildItemsWorld(data) {
   const list = [];
@@ -686,7 +726,7 @@ function questionWorld(item) {
   // flag
   return {
     ...ctx,
-    image: country.flag,
+    image: flagLargeUrl(country) || country.flag,
     portraitKind: "flag",
     mode: "flag",
     correct: country.name,
@@ -840,10 +880,7 @@ function renderPortraitTagNorway(role) {
   return `${badge}<span class="tag-text">${name} · ${partyLabel}</span>`;
 }
 function renderPortraitTagWorld(item) {
-  const flag = item.country.flag
-    ? `<span class="party-badge has-logo size-md"><img src="${escapeAttr(item.country.flag)}" alt="" loading="lazy" decoding="async"></span>`
-    : `<span class="party-badge size-md">${escapeHtml((item.country.iso2 || item.country.iso3 || item.country.name || "?").slice(0, 2).toUpperCase())}</span>`;
-  return `${flag}<span class="tag-text">${escapeHtml(item.leader.name)} · ${escapeHtml(item.country.name)}</span>`;
+  return `${flagBadgeHtml(item.country, "md")}<span class="tag-text">${escapeHtml(item.leader.name)} · ${escapeHtml(item.country.name)}</span>`;
 }
 function partyBadgeNorway(code, size = "sm") {
   const meta = code ? state.data?.parties?.[code] : null;
@@ -1093,16 +1130,13 @@ function personCardWorld(item) {
   const media = item.image
     ? `<img src="${escapeAttr(item.image)}" alt="Bilde av ${escapeAttr(item.leader.name)}" loading="lazy" decoding="async">`
     : `<div class="person-mini">${escapeHtml(initials(item.leader.name))}</div>`;
-  const flag = item.country.flag
-    ? `<span class="party-badge has-logo size-sm"><img src="${escapeAttr(item.country.flag)}" alt="" loading="lazy" decoding="async"></span>`
-    : `<span class="party-badge size-sm">${escapeHtml((item.country.iso2 || item.country.iso3 || item.country.name || "?").slice(0, 2).toUpperCase())}</span>`;
   return `
     <article class="person">
       <div class="person-media">${media}</div>
       <div class="person-body">
         <h3>${escapeHtml(item.leader.name)}</h3>
         <p>${escapeHtml(WORLD_ROLE_LABELS_NO[item.primaryRole] || "Leder")}</p>
-        <span class="person-party">${flag}${escapeHtml(item.country.name)}</span>
+        <span class="person-party">${flagBadgeHtml(item.country, "sm")}${escapeHtml(item.country.name)}</span>
       </div>
     </article>
   `;
