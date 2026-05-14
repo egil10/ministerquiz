@@ -3,23 +3,20 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#ffffff" />
-    <meta
-      name="description"
-      content="Quiz om norske statsråder og verdens ledere — portretter, partier, regjeringer og land."
-    />
+    <meta name="theme-color" content="#fcfcfa" />
+    <meta name="description" content="Quiz om norske statsråder, verdens flagg og verdens ledere." />
     <title>Lederquiz</title>
-    <link rel="preconnect" href="https://upload.wikimedia.org" crossorigin />
-    <link rel="preconnect" href="https://flagcdn.com" crossorigin />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
     <link rel="preload" href="/data/ministers.json" as="fetch" crossorigin="anonymous" />
     <link rel="preload" href="/data/world-leaders.json" as="fetch" crossorigin="anonymous" />
     <link rel="stylesheet" href="/src/styles.css" />
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230a0a0a'/%3E%3Ctext x='50%25' y='58%25' text-anchor='middle' font-family='Inter,sans-serif' font-size='38' font-weight='800' fill='white'%3EL%3C/text%3E%3C/svg%3E" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%230d9488'/%3E%3Ctext x='50%25' y='62%25' text-anchor='middle' font-family='Inter,sans-serif' font-size='34' font-weight='700' fill='white'%3EL%3C/text%3E%3C/svg%3E" />
     <script>
-      // theme bootstrap (avoid flash)
       (function () {
         try {
-          var t = localStorage.getItem("mq.theme");
+          var t = localStorage.getItem("lq.theme");
           if (t === "dark" || (!t && window.matchMedia("(prefers-color-scheme: dark)").matches)) {
             document.documentElement.setAttribute("data-theme", "dark");
           }
@@ -28,197 +25,58 @@
     </script>
   </head>
   <body>
-    <a class="skip-link" href="#stage">Hopp til innholdet</a>
-
     <header class="topbar">
       <div class="topbar-inner">
-        <a class="brand" href="#/hub" data-link="hub">
-          <span class="brand-mark" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-          </span>
-          <span class="brand-text">
-            <span class="brand-title">Lederquiz</span>
-            <span class="brand-pack" id="brandPack"></span>
-          </span>
+        <a class="brand" href="/">
+          <span class="brand-title">Lederquiz</span>
+          <span class="brand-sub" id="brandSub">norge · verden</span>
         </a>
-
-        <div class="topbar-actions">
-          <button class="menu-trigger" id="menuTrigger" type="button" aria-haspopup="true" aria-expanded="false" aria-label="Meny">
-            <span class="menu-trigger-current" id="menuTriggerLabel">Spill</span>
-            <span class="icon icon-menu" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
-            </span>
-          </button>
-          <div class="menu-panel" id="menuPanel" hidden role="menu">
-            <div class="menu-section" data-section="pack">
-              <span class="menu-label">Quiz</span>
-              <div class="menu-list" id="menuPackList"></div>
-            </div>
-            <div class="menu-section" data-section="view">
-              <span class="menu-label">Visning</span>
-              <div class="menu-list">
-                <button class="menu-item" type="button" data-view="play" role="menuitemradio" aria-checked="true">Spill</button>
-                <button class="menu-item" type="button" data-view="learn" role="menuitemradio">Bla</button>
-                <button class="menu-item" type="button" data-view="stats" role="menuitemradio">Stats</button>
-              </div>
-            </div>
-            <div class="menu-section" data-section="advance">
-              <span class="menu-label">Neste spørsmål</span>
-              <div class="menu-list">
-                <button class="menu-item" type="button" data-advance="manual" role="menuitemradio">Manuell</button>
-                <button class="menu-item" type="button" data-advance="2000"   role="menuitemradio">Auto · 2 s</button>
-                <button class="menu-item" type="button" data-advance="3000"   role="menuitemradio">Auto · 3 s</button>
-              </div>
-            </div>
-            <div class="menu-section" data-section="theme">
-              <span class="menu-label">Tema</span>
-              <div class="menu-list">
-                <button class="menu-item" type="button" data-theme="light" role="menuitemradio">Lyst</button>
-                <button class="menu-item" type="button" data-theme="dark"  role="menuitemradio">Mørkt</button>
-                <button class="menu-item" type="button" data-theme="auto"  role="menuitemradio">Auto</button>
-              </div>
-            </div>
-            <div class="menu-footer">
-              <a href="https://www.regjeringen.no" target="_blank" rel="noopener">regjeringen.no</a>
-              <a href="https://www.wikidata.org" target="_blank" rel="noopener">Wikidata</a>
-            </div>
-          </div>
-          <button class="theme-toggle" id="themeToggle" type="button" hidden aria-hidden="true" tabindex="-1"></button>
+        <div class="score">
+          <span><span class="score-value" id="scoreCorrect">0</span>/<span id="scoreTotal">0</span></span>
+          <span class="score-sep">·</span>
+          <span id="scoreStreak" title="Streak">streak 0</span>
+          <button class="theme-btn" id="themeToggle" type="button" aria-label="Bytt tema">tema</button>
         </div>
       </div>
     </header>
 
     <main class="app">
-      <section id="stage" class="stage" aria-live="polite">
-        <!-- hub view -->
-        <section id="hubView" class="hub">
-          <div class="hub-hero">
-            <span class="hub-kicker">Velg quiz</span>
-            <h1 class="hub-title">Hvor godt kjenner du verdens ledere?</h1>
-            <p class="hub-sub">To pakker — over 800 personer å jobbe seg gjennom. Spill med tastatur (1-4), bytt mellom moduser, og se hvor langt du strekker rekken.</p>
-          </div>
-          <div class="hub-grid" id="hubGrid"></div>
-          <div class="hub-foot">
-            <span>Data fra <a href="https://www.regjeringen.no" target="_blank" rel="noopener">regjeringen.no</a> og <a href="https://www.wikidata.org" target="_blank" rel="noopener">Wikidata</a>.</span>
-          </div>
-        </section>
-
-        <!-- loading view -->
-        <section id="loadingView" class="loader" hidden>
-          <div class="loader-inner">
-            <div class="loader-pulse" aria-hidden="true"></div>
-            <p class="loader-text" id="loaderText">Laster pakken…</p>
-          </div>
-        </section>
-
-        <!-- play view -->
-        <article id="playView" class="play" hidden>
-          <aside class="rail">
-            <div class="portrait" id="portrait">
-              <div class="portrait-shimmer" aria-hidden="true"></div>
-              <img id="portraitImg" alt="" decoding="async" width="360" height="480" fetchpriority="high" />
-              <div class="portrait-fallback" id="portraitFallback" aria-hidden="true"></div>
-              <div class="portrait-tag" id="portraitTag" aria-hidden="true"></div>
-            </div>
-            <div class="rail-meta">
-              <span class="rail-meta-year" id="badgeYear">…</span>
-              <span class="rail-meta-streak" id="railStreak" hidden>
-                <span class="icon" data-icon="flame" aria-hidden="true"></span>
-                <span id="railStreakValue">0</span>
-              </span>
-            </div>
-          </aside>
-
-          <div class="card" id="cardEl">
-            <div class="card-head">
-              <span class="kicker" id="badgeMode">…</span>
-              <span class="round" id="roundLabel">1 / 10</span>
-            </div>
-            <div class="round-progress" aria-hidden="true">
-              <span id="roundFill" class="round-progress-fill"></span>
-            </div>
-
-            <h2 id="questionText" class="question">Laster quiz…</h2>
-            <p id="questionHint" class="hint">&nbsp;</p>
-
-            <div class="choices" id="choices"></div>
-
-            <div class="answer" id="answerPanel">
-              <div class="answer-body">
-                <h3 id="answerTitle">&nbsp;</h3>
-                <p id="answerDetail">&nbsp;</p>
-                <p class="answer-links" id="answerLinks"></p>
-              </div>
-              <button class="primary" id="nextBtn" type="button">
-                Neste
-                <kbd>↵</kbd>
-              </button>
-            </div>
-          </div>
-        </article>
-
-        <!-- learn view -->
-        <section id="learnView" class="learn" hidden>
-          <div class="learn-toolbar">
-            <label class="search">
-              <span class="icon" data-icon="search" aria-hidden="true"></span>
-              <input id="learnSearch" type="search" placeholder="Søk…" autocomplete="off" />
-            </label>
-            <select class="toolbar-select" id="learnFilterA"></select>
-            <select class="toolbar-select" id="learnFilterB"></select>
-            <span class="learn-count" id="learnCount">…</span>
-          </div>
-          <div id="learnGrid" class="learn-grid"></div>
-        </section>
-
-        <!-- stats view -->
-        <section id="statsView" class="stats" hidden>
-          <div class="stats-grid">
-            <div class="stats-card">
-              <span>Spilt</span>
-              <strong id="statPlayed">0</strong>
-            </div>
-            <div class="stats-card">
-              <span>Riktige</span>
-              <strong id="statCorrect">0</strong>
-            </div>
-            <div class="stats-card">
-              <span>Treff</span>
-              <strong id="statAccuracyBig">0%</strong>
-            </div>
-            <div class="stats-card">
-              <span>Beste streak</span>
-              <strong id="statBest">0</strong>
-            </div>
-          </div>
-          <div class="stats-block">
-            <span class="stats-block-label">Per modus</span>
-            <table class="mode-table" id="modeTable"></table>
-          </div>
-          <details class="stats-disclosure">
-            <summary>Datagrunnlag</summary>
-            <ul class="data-list" id="dataList"></ul>
-          </details>
-          <div class="stats-actions">
-            <button class="ghost" id="resetProgress" type="button">Nullstill progresjon</button>
-          </div>
-        </section>
+      <section class="intro">
+        <h1>Kjenner du dem igjen?</h1>
+        <p>Velg et bilde, gjett rett person eller land. Bruk tastene 1–4 for å svare raskere.</p>
       </section>
 
-      <!-- mode chips live below the card to stay out of the way -->
-      <section class="controls" id="controls" aria-label="Modus" hidden>
-        <div class="chip-row-list" id="modeList" role="tablist" aria-label="Modus"></div>
-        <select class="era-select" id="eraSelect" aria-label="Filter" hidden></select>
-      </section>
+      <nav class="modes" id="modes" role="tablist" aria-label="Quiz-modus"></nav>
+
+      <div id="stage">
+        <div class="loading" id="loading">laster…</div>
+      </div>
+
+      <div class="stats">
+        <div class="stat">
+          <div class="stat-label">Spilt</div>
+          <div class="stat-value" id="statPlayed">0</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Riktige</div>
+          <div class="stat-value" id="statCorrect">0</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Treff</div>
+          <div class="stat-value" id="statAccuracy">—</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Beste streak</div>
+          <div class="stat-value" id="statBest">0</div>
+        </div>
+      </div>
     </main>
 
-    <!-- celebration overlay -->
-    <div class="confetti" id="confetti" aria-hidden="true"></div>
-
-    <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
-
     <footer class="foot">
-      <p id="footStats" class="foot-stats"></p>
+      Data fra
+      <a href="https://www.regjeringen.no" target="_blank" rel="noopener">regjeringen.no</a>
+      og
+      <a href="https://www.wikidata.org" target="_blank" rel="noopener">wikidata</a>.
     </footer>
 
     <script type="module" src="/src/app.js"></script>
