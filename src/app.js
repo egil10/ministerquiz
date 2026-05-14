@@ -229,10 +229,11 @@ function ministerRolesHtml(p) {
     const meta = [];
     if (r.department) meta.push(r.department);
     if (r.government) meta.push(r.government);
+    const metaTxt = meta.join(" · ");
     return `<li>
       <span class="role-yrs">${escapeHtml(ys)}</span>
-      <span class="role-body">
-        <span class="role-title">${escapeHtml(title)}</span>${meta.length ? `<span class="role-meta"> · ${escapeHtml(meta.join(" · "))}</span>` : ""}${partyChip(r.party)}
+      <span class="role-text">
+        <span class="role-title">${escapeHtml(title)}</span>${metaTxt ? `<span class="role-meta-text">${escapeHtml(metaTxt)}</span>` : ""}${partyChip(r.party)}
       </span>
     </li>`;
   }).join("");
@@ -332,14 +333,18 @@ function renderQuestion() {
   const stage = $("stage");
   stage.innerHTML = `
     <article class="card">
-      <div class="card-image ${q.imageClass}" id="cardImage">
-        <span class="image-fallback" id="imageFallback">···</span>
-        <img id="qImage" alt="" loading="eager" />
+      <div class="card-head">
+        <div class="card-image ${q.imageClass}" id="cardImage">
+          <span class="image-fallback" id="imageFallback">···</span>
+          <img id="qImage" alt="" loading="eager" />
+        </div>
+        <div class="card-meta">
+          <div class="kicker">${escapeHtml(q.kicker)}</div>
+          <h2 class="question">${escapeHtml(q.question)}</h2>
+          <div class="hint">${q.hintHtml ? q.hintHtml : (q.hint && q.hint.trim() ? escapeHtml(q.hint) : "&nbsp;")}</div>
+        </div>
       </div>
-      <div class="card-body">
-        <div class="kicker">${escapeHtml(q.kicker)}</div>
-        <h2 class="question">${escapeHtml(q.question)}</h2>
-        <div class="hint">${q.hintHtml ? q.hintHtml : (q.hint && q.hint.trim() ? escapeHtml(q.hint) : "&nbsp;")}</div>
+      <div class="card-foot">
         <div class="choices" id="choices"></div>
       </div>
       <div class="feedback" id="feedback" hidden>
