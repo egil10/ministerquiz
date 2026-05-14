@@ -20,6 +20,24 @@ const AUTO_OPTIONS = [
   { id: "5s", label: "5s", ms: 5000 },
 ];
 
+const RECENT_HISTORY = 25;
+
+// Normalize formal/long country names to Wikipedia short forms.
+const COUNTRY_NAME_OVERRIDES = {
+  "Kingdom of the Netherlands": "Netherlands",
+  "Kingdom of Denmark": "Denmark",
+  "People's Republic of China": "China",
+  "Republic of the Congo": "Republic of Congo",
+  "Republic of Afghanistan": "Afghanistan",
+  "Democratic Republic of the Congo": "DR Congo",
+  "Czech Republic": "Czechia",
+  "Federation of Malaya": "Malaysia",
+  "realm of the United Kingdom": "United Kingdom",
+  "United States of America": "United States",
+};
+
+const normalizeCountryName = (name) => COUNTRY_NAME_OVERRIDES[name] ?? name;
+
 // --- state ---------------------------------------------------------
 
 const state = {
@@ -32,6 +50,7 @@ const state = {
   autoTimer: null,
   auto: loadAuto(),
   stats: loadStats(),
+  recent: { ministers: [], flags: [], leaders: [] },
 };
 
 // --- bootstrap -----------------------------------------------------
@@ -129,15 +148,24 @@ function buildLeaderPool() {
   if (!state.world) return [];
   const out = [];
   for (const c of state.world.countries) {
+    if (!c.iso3) continue; // skip historical / formal duplicates without ISO codes
+    const country = normalizeCountryName(c.name);
     for (const l of c.leaders) {
       if (l.image) {
         out.push({
           name: l.name,
           image: l.image,
-          country: c.name,
+          country,
           countryFlag: c.flag,
+          countryCapital: c.capital,
           wikipedia: l.wikipedia,
           role: l.primaryRole,
+          roles: l.roles ?? [l.primaryRole].filter(Boolean),
+          qid: l.qid,
+          party: l.party,
+          termStart: l.termStart,
+          isMonarch: l.isMonarch,
+          nextElection: c.nextElection,
         });
       }
     }
@@ -147,7 +175,9 @@ function buildLeaderPool() {
 
 function buildFlagPool() {
   if (!state.world) return [];
-  return state.world.countries.filter((c) => c.flag);
+  return state.world.countries
+    .filter((c) => c.flag && c.iso3)
+    .map((c) => ({ ...c, name: normalizeCountryName(c.name) }));
 }
 
 function buildPool() {
@@ -169,6 +199,26 @@ function pick(arr, n = 1, exclude = new Set()) {
     out.push(filtered[i]);
   }
   return out;
+}
+
+function keyFor(modeId, item) {
+  if (modeId === "ministers") return item.id ?? item.name;
+  if (modeId === "flags") return item.iso3 ?? item.name;
+  return item.qid ?? `${item.name}|${item.country}`;
+}
+
+function pickFresh(pool) {
+  const recent = state.recent[state.mode] ?? [];
+  const recentSet = new Set(recent);
+  const available = pool.filter((x) => !recentSet.has(keyFor(state.mode, x)));
+  const arr = available.length ? available : pool;
+  const choice = arr[Math.floor(Math.random() * arr.length)];
+  const key = keyFor(state.mode, choice);
+  const hist = state.recent[state.mode] ?? (state.recent[state.mode] = []);
+  hist.push(key);
+  const cap = Math.min(RECENT_HISTORY, Math.max(1, pool.length - 4));
+  while (hist.length > cap) hist.shift();
+  return choice;
 }
 
 function shuffle(arr) {
@@ -197,7 +247,7 @@ function nextQuestion() {
 }
 
 function generateMinisterQ() {
-  const correct = pick(state.pool, 1)[0];
+  const correct = pickFresh(state.pool);
   const distractors = pick(state.pool, 3, new Set([correct]))
     .filter((x) => x.name !== correct.name);
   while (distractors.length < 3) {
@@ -276,7 +326,7 @@ function ministerExplanation(p) {
 }
 
 function generateFlagQ() {
-  const correct = pick(state.pool, 1)[0];
+  const correct = pickFresh(state.pool);
   const distractors = pick(state.pool, 3, new Set([correct]));
   const options = shuffle([correct, ...distractors]).map((c) => ({
     label: c.name,
@@ -295,7 +345,7 @@ function generateFlagQ() {
 }
 
 function generateLeaderQ() {
-  const correct = pick(state.pool, 1)[0];
+  const correct = pickFresh(state.pool);
   // distractors from different countries
   const seen = new Set([correct.country]);
   const distractors = [];
@@ -314,6 +364,20 @@ function generateLeaderQ() {
   }));
 
   const roleLabel = state.world.roleLabels?.[correct.role] ?? "Leader";
+  const roleNames = (correct.roles ?? [correct.role])
+    .map((r) => state.world.roleLabels?.[r] ?? r)
+    .filter(Boolean);
+  const partsTxt = roleNames.length
+    ? roleNames.map((r) => r.toLowerCase()).join(", ")
+    : roleLabel.toLowerCase();
+  const bits = [];
+  if (correct.isMonarch) bits.push("monark");
+  if (correct.party) bits.push(escapeHtml(correct.party));
+  if (correct.termStart) bits.push(`tiltrådt ${escapeHtml(String(correct.termStart).slice(0, 4))}`);
+  if (correct.nextElection) bits.push(`neste valg ${escapeHtml(String(correct.nextElection).slice(0, 4))}`);
+  if (correct.countryCapital) bits.push(`hovedstad ${escapeHtml(correct.countryCapital)}`);
+  const extras = bits.length ? ` · ${bits.join(" · ")}` : "";
+  const wiki = correct.wikipedia ? ` · <a href="${correct.wikipedia}" target="_blank" rel="noopener">wiki</a>` : "";
 
   state.question = {
     image: correct.image,
@@ -322,7 +386,7 @@ function generateLeaderQ() {
     question: "Hvilket land leder denne personen?",
     hint: correct.name,
     options,
-    explanation: `<strong>${escapeHtml(correct.name)}</strong> — ${escapeHtml(roleLabel.toLowerCase())} i ${escapeHtml(correct.country)}${correct.wikipedia ? ` · <a href="${correct.wikipedia}" target="_blank" rel="noopener">wiki</a>` : ""}`,
+    explanation: `<strong>${escapeHtml(correct.name)}</strong> — ${escapeHtml(partsTxt)} i ${escapeHtml(correct.country)}${extras}${wiki}`,
   };
 }
 
@@ -347,9 +411,9 @@ function renderQuestion() {
       <div class="card-foot">
         <div class="choices" id="choices"></div>
       </div>
-      <div class="feedback" id="feedback" hidden>
+      <div class="feedback" id="feedback">
         <div class="feedback-text" id="feedbackText"></div>
-        <button class="next" id="nextBtn" type="button">neste <kbd>↵</kbd></button>
+        <button class="next" id="nextBtn" type="button" hidden>neste <kbd>↵</kbd></button>
       </div>
     </article>
   `;
@@ -413,10 +477,9 @@ function answer(i) {
   saveStats();
   renderStats();
 
-  // feedback
-  const fb = $("feedback");
-  fb.hidden = false;
+  // feedback (container is always visible; reveal text + button on answer)
   $("feedbackText").innerHTML = (chosen.correct ? "Riktig — " : "Feil — ") + q.explanation;
+  $("nextBtn").hidden = false;
 
   // auto advance if a delay is configured
   const ms = autoMs();

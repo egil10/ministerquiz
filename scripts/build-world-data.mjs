@@ -78,12 +78,23 @@ ORDER BY ?countryLabel
 function leadersQuery(prop) {
   // current officeholder via simple truthy property (wdt:P35 / wdt:P6), then refine via p:/ps: chain so we can drop ended terms
   return `
-SELECT DISTINCT ?country ?leader ?leaderLabel ?image ?wikiUrl WHERE {
+SELECT DISTINCT ?country ?leader ?leaderLabel ?image ?wikiUrl ?termStart ?partyLabel ?monarch WHERE {
   ?country wdt:P463 wd:Q1065 .
   ?country p:${prop} ?stmt .
   ?stmt ps:${prop} ?leader .
   FILTER NOT EXISTS { ?stmt pq:P582 ?endTime . }
+  OPTIONAL { ?stmt pq:P580 ?termStart . }
   OPTIONAL { ?leader wdt:P18 ?image . }
+  OPTIONAL {
+    ?leader wdt:P102 ?party .
+    ?party rdfs:label ?partyLabel .
+    FILTER(LANG(?partyLabel) = "en")
+  }
+  OPTIONAL {
+    ?leader wdt:P39 ?position .
+    ?position (wdt:P279|wdt:P31)* wd:Q116 .
+    BIND(true AS ?monarch)
+  }
   OPTIONAL {
     ?wikiUrl schema:about ?leader ;
              schema:isPartOf <https://en.wikipedia.org/> .
@@ -164,6 +175,9 @@ async function loadRole(prop, role) {
       qid: qidFromUri(val(row, "leader")),
       image: val(row, "image"),
       wikipedia: val(row, "wikiUrl"),
+      termStart: val(row, "termStart"),
+      party: val(row, "partyLabel"),
+      isMonarch: !!val(row, "monarch"),
     });
   }
 }
@@ -230,6 +244,9 @@ for (const country of countries.values()) {
       if (!prev.roles.includes(leader.role)) prev.roles.push(leader.role);
       prev.image ||= leader.image;
       prev.wikipedia ||= leader.wikipedia;
+      prev.termStart ||= leader.termStart;
+      prev.party ||= leader.party;
+      prev.isMonarch = prev.isMonarch || leader.isMonarch;
     }
   }
   let leaders = [...byQid.values()].map((l) => {
