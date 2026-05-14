@@ -116,6 +116,12 @@ button { font-family: inherit; cursor: pointer; }
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+@media (max-width: 520px) {
+  .score { gap: 8px; }
 }
 
 .score-value { color: var(--text); }
@@ -135,6 +141,37 @@ button { font-family: inherit; cursor: pointer; }
 .theme-btn:hover {
   border-color: var(--border-strong);
   color: var(--text);
+}
+
+.auto-toggle {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.auto-opt {
+  background: transparent;
+  border: 0;
+  border-right: 1px solid var(--border);
+  padding: 5px 7px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  transition: background 0.12s, color 0.12s;
+}
+
+.auto-opt:last-child { border-right: 0; }
+.auto-opt:hover { color: var(--text); }
+
+.auto-opt[aria-checked="true"] {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+@media (max-width: 520px) {
+  .auto-opt { padding: 5px 6px; }
 }
 
 /* ------------------------------------------------------------ main */
@@ -281,6 +318,60 @@ button { font-family: inherit; cursor: pointer; }
   color: var(--text-muted);
   font-size: 13px;
   min-height: 1.4em;
+}
+
+.role-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.role-list li {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  line-height: 1.4;
+}
+
+.role-yrs {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-faint);
+  min-width: 64px;
+  flex-shrink: 0;
+  text-align: right;
+}
+
+.role-body {
+  flex: 1;
+  font-size: 13px;
+}
+
+.role-title { color: var(--text); }
+.role-meta { color: var(--text-faint); }
+
+.role-party {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.role-party-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+@media (max-width: 520px) {
+  .role-yrs { min-width: 56px; }
 }
 
 /* ------------------------------------------------------------ choices */

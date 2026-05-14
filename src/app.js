@@ -11,7 +11,14 @@
 
 const STORAGE_THEME = "lq.theme";
 const STORAGE_STATS = "lq.stats.v2";
-const AUTO_NEXT_MS = 1400;
+const STORAGE_AUTO = "lq.auto";
+
+const AUTO_OPTIONS = [
+  { id: "manual", label: "manuell", ms: 0 },
+  { id: "1s", label: "1s", ms: 1000 },
+  { id: "3s", label: "3s", ms: 3000 },
+  { id: "5s", label: "5s", ms: 5000 },
+];
 
 // --- state ---------------------------------------------------------
 
@@ -23,6 +30,7 @@ const state = {
   question: null,
   answered: false,
   autoTimer: null,
+  auto: loadAuto(),
   stats: loadStats(),
 };
 
@@ -40,6 +48,7 @@ document.addEventListener("DOMContentLoaded", init);
 
 async function init() {
   renderModes();
+  renderAutoToggle();
   setupTheme();
   setupKeyboard();
   renderStats();
@@ -205,10 +214,48 @@ function generateMinisterQ() {
     imageClass: "portrait",
     kicker: ministerKicker(correct),
     question: "Hvem er dette?",
-    hint: "Norsk statsråd eller statsminister",
+    hintHtml: ministerRolesHtml(correct),
     options,
     explanation: ministerExplanation(correct),
   };
+}
+
+function ministerRolesHtml(p) {
+  const roles = (p.roles ?? []).slice().sort((a, b) => (a.start ?? "").localeCompare(b.start ?? ""));
+  if (!roles.length) return "";
+  const items = roles.map((r) => {
+    const ys = roleYears(r);
+    const title = r.title || "Statsråd";
+    const meta = [];
+    if (r.department) meta.push(r.department);
+    if (r.government) meta.push(r.government);
+    return `<li>
+      <span class="role-yrs">${escapeHtml(ys)}</span>
+      <span class="role-body">
+        <span class="role-title">${escapeHtml(title)}</span>${meta.length ? `<span class="role-meta"> · ${escapeHtml(meta.join(" · "))}</span>` : ""}${partyChip(r.party)}
+      </span>
+    </li>`;
+  }).join("");
+  return `<ul class="role-list">${items}</ul>`;
+}
+
+function roleYears(r) {
+  const s = (r.start || "").slice(0, 4);
+  const e = (r.end || "").slice(0, 4);
+  if (s && e) return s === e ? s : `${s}–${e}`;
+  return s || e || "";
+}
+
+function partyChip(code) {
+  if (!code) return "";
+  const p = state.ministers?.parties?.[code];
+  const name = p?.name ?? code;
+  const color = (p && p.color) ? p.color : "currentColor";
+  return ` <span class="role-party"><span class="role-party-dot" style="background:${escapeAttr(color)}"></span>${escapeHtml(name)}</span>`;
+}
+
+function escapeAttr(s) {
+  return String(s).replace(/[<>"']/g, "");
 }
 
 function ministerKicker(p) {
@@ -292,7 +339,7 @@ function renderQuestion() {
       <div class="card-body">
         <div class="kicker">${escapeHtml(q.kicker)}</div>
         <h2 class="question">${escapeHtml(q.question)}</h2>
-        <p class="hint">${q.hint && q.hint.trim() ? escapeHtml(q.hint) : "&nbsp;"}</p>
+        <div class="hint">${q.hintHtml ? q.hintHtml : (q.hint && q.hint.trim() ? escapeHtml(q.hint) : "&nbsp;")}</div>
         <div class="choices" id="choices"></div>
       </div>
       <div class="feedback" id="feedback" hidden>
@@ -366,10 +413,52 @@ function answer(i) {
   fb.hidden = false;
   $("feedbackText").innerHTML = (chosen.correct ? "Riktig — " : "Feil — ") + q.explanation;
 
-  // auto advance on correct
-  if (chosen.correct) {
-    state.autoTimer = setTimeout(nextQuestion, AUTO_NEXT_MS);
+  // auto advance if a delay is configured
+  const ms = autoMs();
+  if (ms > 0) {
+    state.autoTimer = setTimeout(nextQuestion, ms);
   }
+}
+
+// --- auto-next toggle ----------------------------------------------
+
+function loadAuto() {
+  try {
+    const raw = localStorage.getItem(STORAGE_AUTO);
+    if (raw && AUTO_OPTIONS.some((o) => o.id === raw)) return raw;
+  } catch {}
+  return "1s";
+}
+
+function autoMs() {
+  const opt = AUTO_OPTIONS.find((o) => o.id === state.auto);
+  return opt ? opt.ms : 0;
+}
+
+function renderAutoToggle() {
+  const el = $("autoToggle");
+  if (!el) return;
+  el.innerHTML = "";
+  AUTO_OPTIONS.forEach((o) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "auto-opt";
+    b.dataset.auto = o.id;
+    b.textContent = o.label;
+    b.setAttribute("role", "radio");
+    b.setAttribute("aria-checked", String(o.id === state.auto));
+    b.addEventListener("click", () => setAuto(o.id));
+    el.appendChild(b);
+  });
+}
+
+function setAuto(id) {
+  if (!AUTO_OPTIONS.some((o) => o.id === id)) return;
+  state.auto = id;
+  try { localStorage.setItem(STORAGE_AUTO, id); } catch {}
+  document.querySelectorAll(".auto-opt").forEach((b) => {
+    b.setAttribute("aria-checked", String(b.dataset.auto === id));
+  });
 }
 
 // --- stats ---------------------------------------------------------
