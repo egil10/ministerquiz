@@ -250,6 +250,12 @@ button { font-family: inherit; cursor: pointer; }
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   overflow: hidden;
+  animation: card-in 0.22s ease both;
+}
+
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: none; }
 }
 
 .card-head {
@@ -274,7 +280,11 @@ button { font-family: inherit; cursor: pointer; }
   max-height: 100%;
   object-fit: contain;
   display: block;
+  opacity: 0;
+  transition: opacity 0.2s ease;
 }
+
+.card-image img.is-loaded { opacity: 1; }
 
 .card-image.flag img {
   width: 80%;
@@ -491,6 +501,13 @@ button { font-family: inherit; cursor: pointer; }
   border-color: var(--correct);
   background: var(--correct-bg);
   color: var(--correct);
+  animation: pop 0.26s ease;
+}
+
+@keyframes pop {
+  0%   { transform: scale(1); }
+  45%  { transform: scale(1.025); }
+  100% { transform: scale(1); }
 }
 .choice.correct .choice-key { border-color: var(--correct); color: var(--correct); }
 
@@ -631,4 +648,17 @@ button { font-family: inherit; cursor: pointer; }
   outline: 2px solid var(--accent);
   outline-offset: 2px;
   border-radius: var(--radius-sm);
+}
+
+/* ------------------------------------------------------------ motion */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }

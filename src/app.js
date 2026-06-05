@@ -46,12 +46,17 @@ const state = {
   mode: "ministers",
   pool: [],
   question: null,
+  queue: [], // pre-generated upcoming questions (images preloaded)
   answered: false,
   autoTimer: null,
   auto: loadAuto(),
   stats: loadStats(),
   recent: { ministers: [], flags: [], leaders: [] },
 };
+
+// Keep preloaded <img> objects alive so the browser cache holds them.
+const preloadCache = new Map();
+const LOOKAHEAD = 2;
 
 // --- bootstrap -----------------------------------------------------
 
@@ -112,6 +117,7 @@ function renderModes() {
 function setMode(id) {
   state.mode = id;
   localStorage.setItem("lq.mode", id);
+  state.queue = [];
   buildPool();
   document.querySelectorAll(".mode").forEach((b) => {
     b.setAttribute("aria-pressed", String(b.dataset.mode === id));
@@ -230,6 +236,37 @@ function shuffle(arr) {
   return a;
 }
 
+function buildQuestion() {
+  if (state.mode === "ministers") return generateMinisterQ();
+  if (state.mode === "flags") return generateFlagQ();
+  return generateLeaderQ();
+}
+
+// Warm the browser cache for an upcoming image so the swap is instant.
+function preloadImage(url) {
+  if (!url || preloadCache.has(url)) return;
+  const img = new Image();
+  img.decoding = "async";
+  img.src = url;
+  preloadCache.set(url, img);
+  // Bound memory: keep only the most recent handful of preloads.
+  if (preloadCache.size > 12) {
+    const oldest = preloadCache.keys().next().value;
+    preloadCache.delete(oldest);
+  }
+}
+
+// Top up the lookahead queue and preload each upcoming image.
+function fillQueue() {
+  if (!state.pool.length) return;
+  while (state.queue.length < LOOKAHEAD) {
+    const q = buildQuestion();
+    if (!q) break;
+    preloadImage(q.image);
+    state.queue.push(q);
+  }
+}
+
 function nextQuestion() {
   clearTimeout(state.autoTimer);
   state.answered = false;
@@ -239,11 +276,11 @@ function nextQuestion() {
     return;
   }
 
-  if (state.mode === "ministers") generateMinisterQ();
-  else if (state.mode === "flags") generateFlagQ();
-  else generateLeaderQ();
+  if (!state.queue.length) fillQueue();
+  state.question = state.queue.shift() ?? buildQuestion();
 
   renderQuestion();
+  fillQueue(); // generate + preload the next ones while the user thinks
 }
 
 function generateMinisterQ() {
@@ -259,9 +296,10 @@ function generateMinisterQ() {
     correct: p.name === correct.name,
   }));
 
-  state.question = {
+  return {
     image: correct.image,
     imageClass: "portrait",
+    alt: "Portrett av norsk statsråd",
     kicker: ministerKicker(correct),
     question: "Hvem er dette?",
     hintHtml: ministerRolesHtml(correct),
@@ -333,9 +371,10 @@ function generateFlagQ() {
     correct: c.name === correct.name,
   }));
 
-  state.question = {
+  return {
     image: correct.flag,
     imageClass: "flag",
+    alt: "Flagg",
     kicker: correct.iso3 || "",
     question: "Hvilket land?",
     hint: correct.capital ? `Hovedstad: ${correct.capital}` : " ",
@@ -379,9 +418,10 @@ function generateLeaderQ() {
   const extras = bits.length ? ` · ${bits.join(" · ")}` : "";
   const wiki = correct.wikipedia ? ` · <a href="${correct.wikipedia}" target="_blank" rel="noopener">wiki</a>` : "";
 
-  state.question = {
+  return {
     image: correct.image,
     imageClass: "portrait",
+    alt: "Portrett av verdensleder",
     kicker: roleLabel,
     question: "Hvilket land leder denne personen?",
     hint: correct.name,
@@ -400,7 +440,7 @@ function renderQuestion() {
       <div class="card-head">
         <div class="card-image ${q.imageClass}" id="cardImage">
           <span class="image-fallback" id="imageFallback">···</span>
-          <img id="qImage" alt="" loading="eager" />
+          <img id="qImage" alt="${escapeHtml(q.alt ?? "")}" loading="eager" decoding="async" />
         </div>
         <div class="card-meta">
           <div class="kicker">${escapeHtml(q.kicker)}</div>
@@ -418,16 +458,21 @@ function renderQuestion() {
     </article>
   `;
 
-  // image
+  // image — reveal instantly if it was preloaded into cache
   const img = $("qImage");
   const fb = $("imageFallback");
   if (q.image) {
-    img.src = q.image;
-    img.onload = () => { fb.style.display = "none"; };
+    const reveal = () => {
+      fb.style.display = "none";
+      img.classList.add("is-loaded");
+    };
+    img.onload = reveal;
     img.onerror = () => {
       img.style.display = "none";
       fb.textContent = "uten bilde";
     };
+    img.src = q.image;
+    if (img.complete && img.naturalWidth > 0) reveal();
   } else {
     img.style.display = "none";
     fb.textContent = "uten bilde";
